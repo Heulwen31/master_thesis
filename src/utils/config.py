@@ -11,8 +11,12 @@ def load_yaml(file_path):
 
 def get_data_config():
     """Loads the data configuration."""
-    # Assuming the config is in project_root/configs/data.yml
-    # We can use an absolute path or relative to this file
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     config_path = os.path.join(base_dir, "configs", "data.yml")
+    return load_yaml(config_path)
+
+def get_model_config():
+    """Loads the model configuration."""
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    config_path = os.path.join(base_dir, "configs", "model.yml")
     return load_yaml(config_path)
