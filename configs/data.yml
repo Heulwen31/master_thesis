@@ -19,6 +19,16 @@ datasets:
       isFraud: "target"
     id_column: "TransactionID"
 
+  fraud_ecommerce:
+    raw_path: "data/raw/fraud_ecommerce/Fraud_Data.csv"
+    mapping_path: "data/raw/fraud_ecommerce/IpAddress_to_Country.csv"
+    column_mapping:
+      purchase_time: "time"
+      class: "target"
+    id_column: "user_id"
+
+
+
 standard_columns:
   - "id"
   - "time"

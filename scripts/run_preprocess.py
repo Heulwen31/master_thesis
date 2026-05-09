@@ -5,15 +5,15 @@ import argparse
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.preprocess.datasets import CreditCardPreprocessor, IEEECISPreprocessor
+from src.preprocess.datasets import CreditCardPreprocessor, IEEECISPreprocessor, EcommerceFraudPreprocessor
 
 def main():
     # Disable bytecode to keep it clean as requested by user
     sys.dont_write_bytecode = True
     
     parser = argparse.ArgumentParser(description="Run data preprocessing for datasets.")
-    parser.add_argument("--dataset", type=str, default="all", choices=["creditcard", "ieee_cis", "all"],
-                        help="The dataset to process (creditcard, ieee_cis, or all)")
+    parser.add_argument("--dataset", type=str, default="all", choices=["creditcard", "ieee_cis", "fraud_ecommerce", "all"],
+                        help="The dataset to process (creditcard, ieee_cis, fraud_ecommerce, or all)")
     
     args = parser.parse_args()
     
@@ -34,6 +34,14 @@ def main():
             ieee_preprocessor.run()
         except Exception as e:
             print(f"Error processing IEEE-CIS: {e}")
+
+    # Process Fraud Ecommerce
+    if args.dataset in ["fraud_ecommerce", "all"]:
+        try:
+            ecommerce_preprocessor = EcommerceFraudPreprocessor()
+            ecommerce_preprocessor.run()
+        except Exception as e:
+            print(f"Error processing Fraud Ecommerce: {e}")
 
     print("\nPreprocessing complete.")
 

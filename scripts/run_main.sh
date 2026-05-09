@@ -18,7 +18,7 @@ while [[ "$#" -gt 0 ]]; do
         --method) METHOD="$2"; shift ;;
         -h|--help) 
             echo "Usage: ./scripts/run_main.sh [--dataset DATASET] [--model MODEL] [--method METHOD]"
-            echo "  --dataset : Name of dataset to process (default: ieee_cis). Choices: ieee_cis, creditcard."
+            echo "  --dataset : Name of dataset to process (default: ieee_cis). Choices: ieee_cis, creditcard, fraud_ecommerce."
             echo "  --model   : Name of the model to evaluate (default: xgboost). Choices: xgboost, lightgbm, catboost."
             echo "  --method  : Evaluation method (default: addm). Choices: addm, periodic."
             exit 0
