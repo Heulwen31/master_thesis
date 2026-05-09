@@ -43,9 +43,14 @@ def main():
     else:
         print(f"✅ Running in FULL mode: using all {len(df)} records.")
 
-    # Convert non-numeric columns to category for XGBoost/LightGBM/CatBoost
+    # Convert non-numeric columns to categorical codes for better compatibility
     cat_cols = df.select_dtypes(exclude=['number', 'bool']).columns
     for col in cat_cols:
+        # Fill NaNs with a placeholder before encoding
+        df[col] = df[col].fillna("Unknown").astype('category')
+        # LightGBM prefers integers starting from 0
+        df[col] = df[col].cat.codes.astype('int32')
+        # Ensure it's still treated as category for models that support it
         df[col] = df[col].astype('category')
 
     y = df['target'].values

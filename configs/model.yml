@@ -19,6 +19,9 @@ lightgbm:
   force_col_wise: true
   verbose: -1          # Ẩn các cảnh báo log
   min_child_samples: 5 # Cho phép chia nhánh với ít mẫu hơn (giúp học tốt hơn trên data nhỏ)
+  min_data_per_group: 100
+  max_cat_threshold: 32
+
 
 catboost:
   iterations: 1000

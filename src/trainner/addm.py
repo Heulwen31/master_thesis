@@ -50,9 +50,6 @@ class ADDM:
             if abs(mu0 - mu1) > epsilon:
                 # Concepts are different, shrink window by removing the oldest element
                 self.window.pop(0)
-                # Print occasionally to avoid spam
-                if len(self.window) % 500 == 0:
-                    print(f"Popping! Window size: {len(self.window)}, mu0: {mu0:.3f}, mu1: {mu1:.3f}, epsilon: {epsilon:.3f}")
                 
     def _check_drift(self) -> bool:
         """
@@ -73,8 +70,7 @@ class ADDM:
         entropy = -p1 * math.log2(p1) - p0 * math.log2(p0)
         
         # Debug entropy
-        if entropy > 0.8:
-            print(f"Entropy: {entropy:.3f}, p1: {p1:.3f}, window_size: {len(self.window)}")
+
             
         if entropy >= self.entropy_threshold:
             return True
