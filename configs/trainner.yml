@@ -11,3 +11,6 @@ addm:
 periodic:
   retrain_interval: 1000 # Number of transactions before retraining
 
+incremental:
+  update_interval: 1000  # Number of samples before incremental update
+  update_trees: 100       # Number of new trees to add per update
