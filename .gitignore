@@ -116,6 +116,11 @@ dmypy.json
 
 # Data science specific
 data/raw/
+data/processed/
+*.parquet
+*.csv
+*.zip
+*.gz
 
 # macOS
 .DS_Store

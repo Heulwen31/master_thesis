@@ -1,10 +1,13 @@
+standard_names:
+  time: "time"
+  target: "target"
+
 datasets:
   creditcard:
     raw_path: "data/raw/creditcard/creditcard.csv"
     column_mapping:
-      Time: "timestamp"
-      Class: "label"
-    # Note: Credit Card dataset doesn't have a explicit ID, we can use index
+      Time: "time"
+      Class: "target"
     id_column: null
 
   ieee_cis:
@@ -12,11 +15,11 @@ datasets:
     identity_path: "data/raw/ieee_cis_fraud/train_identity.csv"
     column_mapping:
       TransactionID: "id"
-      TransactionDT: "timestamp"
-      isFraud: "label"
+      TransactionDT: "time"
+      isFraud: "target"
     id_column: "TransactionID"
 
 standard_columns:
   - "id"
-  - "timestamp"
-  - "label"
+  - "time"
+  - "target"

@@ -33,9 +33,9 @@ class DataLoader:
                 df_ident = df_ident.rename(columns=mapping)
                 df = df.merge(df_ident, on='id', how='left')
         
-        # Ensure timestamp is numeric (Kaggle datasets usually have it as seconds/offset)
-        if 'timestamp' in df.columns:
-            df['timestamp'] = pd.to_numeric(df['timestamp'], errors='coerce')
+        # Ensure time is numeric (Kaggle datasets usually have it as seconds/offset)
+        if 'time' in df.columns:
+            df['time'] = pd.to_numeric(df['time'], errors='coerce')
             
         print(f"Loaded {self.dataset_name} with shape {df.shape}")
         return df
