@@ -7,13 +7,15 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.models.factory import create_model
 from src.trainner.online_evaluator import OnlineEvaluator
-from src.trainner.reporter import DriftReporter
+from src.trainner.periodic_evaluator import PeriodicEvaluator
+from src.evaluation.reporter import DriftReporter
 from src.utils.config import get_trainner_config
 
 def main():
     parser = argparse.ArgumentParser(description="Run the ADDM evaluation pipeline.")
     parser.add_argument("--dataset", type=str, default="ieee_cis", choices=["ieee_cis", "creditcard"], help="Dataset to evaluate on")
     parser.add_argument("--model", type=str, default="xgboost", choices=["xgboost", "lightgbm", "catboost"], help="Model to use")
+    parser.add_argument("--method", type=str, default="addm", choices=["addm", "periodic"], help="Evaluation method")
     args = parser.parse_args()
 
     # Load config
@@ -50,7 +52,12 @@ def main():
     
     # 2. Initialize Components
     model = create_model(args.model)
-    evaluator = OnlineEvaluator(model, X_df, y)
+    
+    if args.method == "addm":
+        evaluator = OnlineEvaluator(model, X_df, y)
+    elif args.method == "periodic":
+        evaluator = PeriodicEvaluator(model, X_df, y)
+        
     reporter = DriftReporter(args.dataset, args.model)
     
     # 3. Initial Training (Warm-up)
