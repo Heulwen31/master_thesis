@@ -1,0 +1,22 @@
+datasets:
+  creditcard:
+    raw_path: "data/raw/creditcard/creditcard.csv"
+    column_mapping:
+      Time: "timestamp"
+      Class: "label"
+    # Note: Credit Card dataset doesn't have a explicit ID, we can use index
+    id_column: null
+
+  ieee_cis:
+    raw_path: "data/raw/ieee_cis_fraud/train_transaction.csv"
+    identity_path: "data/raw/ieee_cis_fraud/train_identity.csv"
+    column_mapping:
+      TransactionID: "id"
+      TransactionDT: "timestamp"
+      isFraud: "label"
+    id_column: "TransactionID"
+
+standard_columns:
+  - "id"
+  - "timestamp"
+  - "label"
