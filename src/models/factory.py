@@ -19,7 +19,7 @@ class ModelFactory:
         
         if model_type == "xgboost":
             print(f"Initializing XGBoost with params: {params}")
-            return xgb.XGBClassifier(**params)
+            return xgb.XGBClassifier(enable_categorical=True, **params)
         
         elif model_type == "lightgbm":
             print(f"Initializing LightGBM with params: {params}")

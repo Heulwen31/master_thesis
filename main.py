@@ -43,9 +43,10 @@ def main():
     else:
         print(f"✅ Running in FULL mode: using all {len(df)} records.")
 
-    for col in df.columns:
-        if df[col].dtype == 'object':
-            df[col] = df[col].astype('category')
+    # Convert non-numeric columns to category for XGBoost/LightGBM/CatBoost
+    cat_cols = df.select_dtypes(exclude=['number', 'bool']).columns
+    for col in cat_cols:
+        df[col] = df[col].astype('category')
 
     y = df['target'].values
     X_df = df.drop(columns=['target'])
