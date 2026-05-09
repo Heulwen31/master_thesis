@@ -5,7 +5,7 @@ DATASET="all"
 
 # Help message
 function show_help {
-    echo "Usage: ./scripts/data_process.sh [options]"
+    echo "Usage: ./scripts/run_preprocess.sh [options]"
     echo ""
     echo "Options:"
     echo "  -d, --dataset <name>    Specify dataset to process (creditcard, ieee_cis, all) [default: all]"
