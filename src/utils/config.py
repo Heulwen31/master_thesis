@@ -20,3 +20,9 @@ def get_model_config():
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     config_path = os.path.join(base_dir, "configs", "model.yml")
     return load_yaml(config_path)
+    
+def get_trainner_config():
+    """Loads the trainner configuration."""
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    config_path = os.path.join(base_dir, "configs", "trainner.yml")
+    return load_yaml(config_path)

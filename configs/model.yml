@@ -16,6 +16,9 @@ lightgbm:
   bagging_fraction: 0.8
   random_state: 42
   n_jobs: -1
+  force_col_wise: true
+  verbose: -1          # Ẩn các cảnh báo log
+  min_child_samples: 5 # Cho phép chia nhánh với ít mẫu hơn (giúp học tốt hơn trên data nhỏ)
 
 catboost:
   iterations: 1000
