@@ -37,3 +37,18 @@ class CreditCardPreprocessor(BasePreprocessor):
 class IEEECISPreprocessor(BasePreprocessor):
     def __init__(self):
         super().__init__("ieee_cis")
+
+    def run(self):
+        """Standard pipeline: load, process time, drop id, save to parquet."""
+        df = self.loader.load_raw()
+        df = self.process_time(df)
+        
+        # Remove TransactionID (which is mapped to 'id')
+        if 'id' in df.columns:
+            print(f"Removing 'id' column for {self.dataset_name}...")
+            df = df.drop(columns=['id'])
+            
+        output_path = os.path.join(self.output_dir, f"{self.dataset_name}.parquet")
+        print(f"Saving processed data to {output_path}...")
+        df.to_parquet(output_path, engine='pyarrow', index=False)
+        print(f"Done processing {self.dataset_name}.")
