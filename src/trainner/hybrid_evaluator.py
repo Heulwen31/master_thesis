@@ -53,7 +53,8 @@ class HybridEvaluator(BaseEvaluator):
         else:
             X_init = self.X[:initial_train_size]
             
-        self.buffer_long_X = X_init.values if hasattr(X_init, 'values') else X_init
+        # Fill NaNs for NN search (distance-based algorithms cannot handle NaNs)
+        self.buffer_long_X = X_init.fillna(0).values if hasattr(X_init, 'fillna') else np.nan_to_num(X_init, nan=0)
         self.buffer_short_X = self.buffer_long_X.copy()
         
         # Fit NN indices
@@ -69,7 +70,8 @@ class HybridEvaluator(BaseEvaluator):
         else:
             X_test_df = self.X[i:i+1]
             
-        X_test_val = X_test_df.values if hasattr(X_test_df, 'values') else X_test_df
+        # Fill NaNs for query sample
+        X_test_val = X_test_df.fillna(0).values if hasattr(X_test_df, 'fillna') else np.nan_to_num(X_test_df, nan=0)
         y_true = self.y[i]
         
         # 1. Search in Short Buffer
@@ -89,7 +91,6 @@ class HybridEvaluator(BaseEvaluator):
             y_prob = self.model_long.predict_proba(X_test_df)[0][1]
         else:
             # Combine based on inverse distance weights
-            # Avg distance of k neighbors
             avg_d_short = np.mean(d_short[0])
             avg_d_long = np.mean(d_long[0])
             
@@ -130,7 +131,8 @@ class HybridEvaluator(BaseEvaluator):
                 X_batch = self.X.iloc[res_idx:i+1]
             else:
                 X_batch = self.X[res_idx:i+1]
-            self.buffer_long_X = X_batch.values if hasattr(X_batch, 'values') else X_batch
+            # Fill NaNs for NN
+            self.buffer_long_X = X_batch.fillna(0).values if hasattr(X_batch, 'fillna') else np.nan_to_num(X_batch, nan=0)
             self.nn_long.fit(self.buffer_long_X)
             
             # Sync Short-term
@@ -148,7 +150,8 @@ class HybridEvaluator(BaseEvaluator):
                 X_batch = self.X.iloc[res_idx:i+1]
             else:
                 X_batch = self.X[res_idx:i+1]
-            self.buffer_short_X = X_batch.values if hasattr(X_batch, 'values') else X_batch
+            # Fill NaNs for NN
+            self.buffer_short_X = X_batch.fillna(0).values if hasattr(X_batch, 'fillna') else np.nan_to_num(X_batch, nan=0)
             self.nn_short.fit(self.buffer_short_X)
             
             return res_idx
