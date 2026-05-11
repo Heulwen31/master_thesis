@@ -94,15 +94,17 @@ class BaseEvaluator:
             self.model.n_estimators = orig_estimators
             
         elif isinstance(self.model, CatBoostClassifier):
-            orig_params = self.model.get_params()
-            orig_iterations = orig_params.get('iterations')
+            # CatBoost does not allow set_params on a fitted model.
+            # We create a new instance with updated iterations for the incremental step.
+            params = self.model.get_params()
+            params['iterations'] = update_trees
             
             # Detect categorical columns
             cat_features = list(X_new.select_dtypes(include=['category']).columns)
             
-            self.model.set_params(iterations=update_trees)
-            self.model.fit(X_new, y_new, init_model=self.model, cat_features=cat_features)
-            self.model.set_params(iterations=orig_iterations)
+            new_model = CatBoostClassifier(**params)
+            new_model.fit(X_new, y_new, init_model=self.model, cat_features=cat_features)
+            self.model = new_model
         
         else:
             # Fallback to standard fit if not supported
