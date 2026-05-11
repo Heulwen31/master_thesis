@@ -45,8 +45,13 @@ class BaseEvaluator:
         return y_true, y_pred, y_prob
 
     def _fit_model(self, X, y):
-        """Standard full model fit."""
-        self.model.fit(X, y)
+        """Standard full model fit with support for categorical features."""
+        from catboost import CatBoostClassifier
+        if isinstance(self.model, CatBoostClassifier):
+            cat_features = list(X.select_dtypes(include=['category']).columns)
+            self.model.fit(X, y, cat_features=cat_features)
+        else:
+            self.model.fit(X, y)
 
     def _update_model(self, X_new, y_new, update_trees=50):
         """Performs library-specific incremental update with class consistency check."""
@@ -91,8 +96,12 @@ class BaseEvaluator:
         elif isinstance(self.model, CatBoostClassifier):
             orig_params = self.model.get_params()
             orig_iterations = orig_params.get('iterations')
+            
+            # Detect categorical columns
+            cat_features = list(X_new.select_dtypes(include=['category']).columns)
+            
             self.model.set_params(iterations=update_trees)
-            self.model.fit(X_new, y_new, init_model=self.model)
+            self.model.fit(X_new, y_new, init_model=self.model, cat_features=cat_features)
             self.model.set_params(iterations=orig_iterations)
         
         else:
