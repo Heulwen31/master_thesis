@@ -1,6 +1,11 @@
 import os
+import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import TargetEncoder
+from sklearn.model_selection import KFold
 from src.data.loader import get_loader
 
 class BasePreprocessor:
@@ -38,8 +43,79 @@ class IEEECISPreprocessor(BasePreprocessor):
     def __init__(self):
         super().__init__("ieee_cis")
 
+    def _remove_high_null_features(self, df):
+        """Remove features with null ratio above threshold."""
+        null_threshold = self.loader.dataset_cfg.get('null_threshold', 0.8)
+        print(f"Removing features with null ratio > {null_threshold} for {self.dataset_name}...")
+        
+        null_ratios = df.isnull().mean()
+        high_null_cols = null_ratios[null_ratios > null_threshold].index.tolist()
+        
+        if high_null_cols:
+            print(f"  Removing {len(high_null_cols)} features: {high_null_cols}")
+            df = df.drop(columns=high_null_cols)
+        else:
+            print("  No features to remove.")
+        
+        return df
+
+    def _encode_categorical(self, df):
+        """Encode categorical columns based on cardinality with cross-validation for TargetEncoder."""
+        print(f"Encoding categorical features for {self.dataset_name}...")
+        
+        # Identify categorical columns (exclude 'target' if present)
+        cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        cat_cols = [col for col in cat_cols if col != 'target']
+        
+        if not cat_cols:
+            print("No categorical columns to encode.")
+            return df
+        
+        # Separate target for TargetEncoder
+        has_target = 'target' in df.columns
+        target = df['target'] if has_target else None
+        
+        for col in cat_cols:
+            n_unique = df[col].nunique()
+            print(f"  Column '{col}': {n_unique} unique values", end="")
+            
+            if n_unique < 3:
+                # Label Encoding
+                print(" -> Label Encoding")
+                le = LabelEncoder()
+                df[col] = le.fit_transform(df[col].astype(str))
+                
+            elif 3 <= n_unique <= 5:
+                # One-Hot Encoding
+                print(" -> One-Hot Encoding")
+                dummies = pd.get_dummies(df[col], prefix=col, dtype='int8')
+                df = pd.concat([df.drop(columns=[col]), dummies], axis=1)
+                
+            else:
+                # Target Encoding with Cross-Validation to avoid data leakage
+                print(" -> Target Encoding with CV")
+                if has_target and target is not None:
+                    # Use KFold cross-validation for TargetEncoder
+                    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+                    encoded_col = np.zeros(len(df))
+                    
+                    for train_idx, test_idx in kf.split(df):
+                        te = TargetEncoder(random_state=42)
+                        # Fit on train fold, transform on test fold
+                        te.fit(df.iloc[train_idx][[col]], target.iloc[train_idx])
+                        encoded_col[test_idx] = te.transform(df.iloc[test_idx][[col]]).ravel()
+                    
+                    df[col] = encoded_col
+                else:
+                    # Fallback: simple TargetEncoder if no target available
+                    print("    (No target available, using simple TargetEncoder)")
+                    te = TargetEncoder(random_state=42)
+                    df[col] = te.fit_transform(df[[col]], target if has_target else pd.Series(0, index=df.index)).ravel()
+        
+        return df
+
     def run(self):
-        """Standard pipeline: load, process time, drop id, save to parquet."""
+        """Standard pipeline: load, process time, drop id, remove high null features, encode categorical, save to parquet."""
         df = self.loader.load_raw()
         df = self.process_time(df)
         
@@ -47,6 +123,12 @@ class IEEECISPreprocessor(BasePreprocessor):
         if 'id' in df.columns:
             print(f"Removing 'id' column for {self.dataset_name}...")
             df = df.drop(columns=['id'])
+        
+        # Remove features with high null ratio
+        df = self._remove_high_null_features(df)
+        
+        # Encode categorical features with appropriate strategy
+        df = self._encode_categorical(df)
             
         output_path = os.path.join(self.output_dir, f"{self.dataset_name}.parquet")
         print(f"Saving processed data to {output_path}...")
@@ -56,6 +138,81 @@ class IEEECISPreprocessor(BasePreprocessor):
 class EcommerceFraudPreprocessor(BasePreprocessor):
     def __init__(self):
         super().__init__("fraud_ecommerce")
+
+    def _standardize_ip(self, df):
+        if 'ip_address' in df.columns:
+            print(f"Standardizing IP address values for {self.dataset_name}...")
+            df['ip_address'] = pd.to_numeric(df['ip_address'], errors='coerce')
+            if df['ip_address'].notna().any():
+                min_ip = df['ip_address'].min()
+                max_ip = df['ip_address'].max()
+                if max_ip > min_ip:
+                    df['ip_address'] = (df['ip_address'] - min_ip) / (max_ip - min_ip)
+                else:
+                    df['ip_address'] = 0.0
+        return df
+
+    def _log_transform_amount(self, df, amount_col):
+        if amount_col in df.columns:
+            print(f"Applying log transform to {amount_col} for {self.dataset_name}...")
+            df[amount_col] = pd.to_numeric(df[amount_col], errors='coerce').fillna(0.0)
+            df[amount_col] = np.log1p(df[amount_col].clip(lower=0))
+        return df
+
+    def _encode_categorical(self, df):
+        """Encode categorical columns based on cardinality with cross-validation for TargetEncoder."""
+        print(f"Encoding categorical features for {self.dataset_name}...")
+        
+        # Identify categorical columns (exclude 'target' if present)
+        cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        cat_cols = [col for col in cat_cols if col != 'target']
+        
+        if not cat_cols:
+            print("No categorical columns to encode.")
+            return df
+        
+        # Separate target for TargetEncoder
+        has_target = 'target' in df.columns
+        target = df['target'] if has_target else None
+        
+        for col in cat_cols:
+            n_unique = df[col].nunique()
+            print(f"  Column '{col}': {n_unique} unique values", end="")
+            
+            if n_unique < 3:
+                # Label Encoding
+                print(" -> Label Encoding")
+                le = LabelEncoder()
+                df[col] = le.fit_transform(df[col].astype(str))
+                
+            elif 3 <= n_unique <= 5:
+                # One-Hot Encoding
+                print(" -> One-Hot Encoding")
+                dummies = pd.get_dummies(df[col], prefix=col, dtype='int8')
+                df = pd.concat([df.drop(columns=[col]), dummies], axis=1)
+                
+            else:
+                # Target Encoding with Cross-Validation to avoid data leakage
+                print(" -> Target Encoding with CV")
+                if has_target and target is not None:
+                    # Use KFold cross-validation for TargetEncoder
+                    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+                    encoded_col = np.zeros(len(df))
+                    
+                    for train_idx, test_idx in kf.split(df):
+                        te = TargetEncoder(random_state=42)
+                        # Fit on train fold, transform on test fold
+                        te.fit(df.iloc[train_idx][[col]], target.iloc[train_idx])
+                        encoded_col[test_idx] = te.transform(df.iloc[test_idx][[col]]).ravel()
+                    
+                    df[col] = encoded_col
+                else:
+                    # Fallback: simple TargetEncoder if no target available
+                    print("    (No target available, using simple TargetEncoder)")
+                    te = TargetEncoder(random_state=42)
+                    df[col] = te.fit_transform(df[[col]], target if has_target else pd.Series(0, index=df.index)).ravel()
+        
+        return df
 
     def run(self):
         """Pipeline for Ecommerce Fraud: handles string dates, joins with IP mapping, drops id, saves to parquet."""
@@ -96,6 +253,10 @@ class EcommerceFraudPreprocessor(BasePreprocessor):
         mapping = self.loader.dataset_cfg.get('column_mapping', {})
         df = df.rename(columns=mapping)
         
+        # Preprocess IP column and purchase amount
+        df = self._standardize_ip(df)
+        df = self._log_transform_amount(df, 'purchase_value')
+        
         # Handle time: it's a string '2015-02-24 22:55:49'
         print(f"Converting string time to datetime for {self.dataset_name}...")
         df['time'] = pd.to_datetime(df['time'])
@@ -114,8 +275,12 @@ class EcommerceFraudPreprocessor(BasePreprocessor):
         if cols_to_drop:
             print(f"Removing columns: {cols_to_drop}...")
             df = df.drop(columns=cols_to_drop)
+        
+        # Encode categorical features with appropriate strategy
+        df = self._encode_categorical(df)
             
         output_path = os.path.join(self.output_dir, f"{self.dataset_name}.parquet")
         print(f"Saving processed data to {output_path}...")
         df.to_parquet(output_path, engine='pyarrow', index=False)
         print(f"Done processing {self.dataset_name}.")
+

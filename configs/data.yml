@@ -18,6 +18,7 @@ datasets:
       TransactionDT: "time"
       isFraud: "target"
     id_column: "TransactionID"
+    null_threshold: 0.8  # Loại bỏ feature nếu tỷ lệ null > 80%
 
   fraud_ecommerce:
     raw_path: "data/raw/fraud_ecommerce/Fraud_Data.csv"
