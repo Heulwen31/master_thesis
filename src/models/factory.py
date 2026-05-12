@@ -26,7 +26,8 @@ class ModelFactory:
             return lgb.LGBMClassifier(**params)
         
         elif model_type == "catboost":
-            params.setdefault("verbose", False)
+            for alias in ("verbose", "verbose_eval", "silent"):
+                params.pop(alias, None)
             params.setdefault("logging_level", "Silent")
             params.setdefault("allow_writing_files", False)
             print(f"Initializing CatBoost with params: {params}")

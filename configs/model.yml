@@ -30,6 +30,5 @@ catboost:
   depth: 6
   learning_rate: 0.05
   random_seed: 42
-  verbose: false         # Tắt hiển thị tiến trình training
   logging_level: "Silent"
   allow_writing_files: false

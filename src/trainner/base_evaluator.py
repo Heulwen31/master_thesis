@@ -47,38 +47,74 @@ class BaseEvaluator:
     def _fit_model(self, X, y):
         """Standard full model fit with support for categorical features."""
         from catboost import CatBoostClassifier
+        X, y = self._ensure_two_classes(X, y)
         if isinstance(self.model, CatBoostClassifier):
             cat_features = list(X.select_dtypes(include=['category']).columns)
             self.model.fit(X, y, cat_features=cat_features)
         else:
             self.model.fit(X, y)
 
+    def _ensure_two_classes(self, X_batch, y_batch, max_extra_samples=5):
+        """Adds a few historical samples if a retraining batch has only one class."""
+        unique_classes = np.unique(y_batch)
+        if len(unique_classes) >= 2:
+            return X_batch, y_batch
+
+        missing_class = 1 - unique_classes[0]
+        missing_indices = np.where(self.y == missing_class)[0]
+        if len(missing_indices) == 0:
+            return X_batch, y_batch
+
+        end_pos = self._infer_batch_end_position(X_batch)
+        if end_pos is not None:
+            historical_missing_indices = missing_indices[missing_indices <= end_pos]
+            if len(historical_missing_indices) > 0:
+                missing_indices = historical_missing_indices
+
+        extra_idx = missing_indices[:max_extra_samples]
+        if hasattr(self.X, 'iloc'):
+            X_extra = self.X.iloc[extra_idx]
+        else:
+            X_extra = self.X[extra_idx]
+        y_extra = self.y[extra_idx]
+
+        print(
+            f"Retrain batch has one class ({unique_classes[0]}). "
+            f"Added {len(extra_idx)} samples from class {missing_class}."
+        )
+
+        if isinstance(X_batch, pd.DataFrame):
+            X_batch = pd.concat([X_batch, X_extra])
+            y_batch = np.concatenate([y_batch, y_extra])
+        else:
+            X_batch = np.concatenate([X_batch, X_extra])
+            y_batch = np.concatenate([y_batch, y_extra])
+
+        return X_batch, y_batch
+
+    def _infer_batch_end_position(self, X_batch):
+        """Infers the last positional index of a batch sliced from self.X."""
+        if not hasattr(X_batch, 'index') or not hasattr(self.X, 'index') or len(X_batch) == 0:
+            return None
+
+        last_label = X_batch.index[-1]
+        try:
+            loc = self.X.index.get_loc(last_label)
+        except KeyError:
+            return None
+
+        if isinstance(loc, slice):
+            return loc.stop - 1
+        if isinstance(loc, np.ndarray):
+            positions = np.where(loc)[0] if loc.dtype == bool else loc
+            return int(positions[-1]) if len(positions) > 0 else None
+        return int(loc)
+
     def _update_model(self, X_new, y_new, update_trees=50):
         """Performs library-specific incremental update with class consistency check."""
         
-        # Ensure y_new contains both classes to avoid scikit-learn LabelEncoder issues
-        unique_classes = np.unique(y_new)
-        if len(unique_classes) < 2:
-            missing_class = 1 - unique_classes[0]
-            # Find indices of the missing class in historical data
-            hist_y = self.y[:len(self.X)]
-            missing_indices = np.where(hist_y == missing_class)[0]
-            
-            if len(missing_indices) > 0:
-                # Take up to 5 samples of the missing class
-                extra_idx = missing_indices[:5]
-                if hasattr(self.X, 'iloc'):
-                    X_extra = self.X.iloc[extra_idx]
-                else:
-                    X_extra = self.X[extra_idx]
-                y_extra = self.y[extra_idx]
-                
-                if isinstance(X_new, pd.DataFrame):
-                    X_new = pd.concat([X_new, X_extra])
-                    y_new = np.concatenate([y_new, y_extra])
-                else:
-                    X_new = np.concatenate([X_new, X_extra])
-                    y_new = np.concatenate([y_new, y_extra])
+        # Ensure y_new contains both classes to avoid classifier label issues.
+        X_new, y_new = self._ensure_two_classes(X_new, y_new)
 
         # Save original estimator count to restore later
         if isinstance(self.model, xgb.XGBClassifier):
