@@ -15,28 +15,28 @@ mkdir -p outputs/models
 mkdir -p outputs/results
 
 # 2. Copy data from Kaggle input
-# NOTE: Paths below assume standard Kaggle input naming. 
-# Adjust if your custom dataset has a different name.
+# Custom paths provided by user
+KAGLE_INPUT_DIR="/kaggle/input/datasets/trandongnam/fraud-detection"
 
-echo "📂 Copying datasets from Kaggle input..."
+echo "📂 Copying datasets from $KAGLE_INPUT_DIR..."
 
 # Credit Card Fraud
-if [ -d "/kaggle/input/creditcardfraud" ]; then
-    cp /kaggle/input/creditcardfraud/creditcard.csv data/raw/creditcard/
+if [ -f "$KAGLE_INPUT_DIR/creditcard.csv" ]; then
+    cp "$KAGLE_INPUT_DIR/creditcard.csv" data/raw/creditcard/
     echo "✅ Credit Card dataset copied."
 fi
 
 # IEEE-CIS Fraud
-if [ -d "/kaggle/input/ieee-fraud-detection" ]; then
-    cp /kaggle/input/ieee-fraud-detection/train_transaction.csv data/raw/ieee_cis_fraud/
-    cp /kaggle/input/ieee-fraud-detection/train_identity.csv data/raw/ieee_cis_fraud/
+if [ -f "$KAGLE_INPUT_DIR/train_transaction.csv" ]; then
+    cp "$KAGLE_INPUT_DIR/train_transaction.csv" data/raw/ieee_cis_fraud/
+    cp "$KAGLE_INPUT_DIR/train_identity.csv" data/raw/ieee_cis_fraud/
     echo "✅ IEEE-CIS dataset copied."
 fi
 
-# Ecommerce Fraud (Assuming custom name or specific dataset)
-if [ -d "/kaggle/input/fraud-ecommerce" ]; then
-    cp /kaggle/input/fraud-ecommerce/Fraud_Data.csv data/raw/fraud_ecommerce/
-    cp /kaggle/input/fraud-ecommerce/IpAddress_to_Country.csv data/raw/fraud_ecommerce/
+# Ecommerce Fraud
+if [ -f "$KAGLE_INPUT_DIR/Fraud_Data.csv" ]; then
+    cp "$KAGLE_INPUT_DIR/Fraud_Data.csv" data/raw/fraud_ecommerce/
+    cp "$KAGLE_INPUT_DIR/IpAddress_to_Country.csv" data/raw/fraud_ecommerce/
     echo "✅ Ecommerce Fraud dataset copied."
 fi
 
