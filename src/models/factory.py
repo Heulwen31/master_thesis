@@ -2,6 +2,7 @@ import xgboost as xgb
 import lightgbm as lgb
 from catboost import CatBoostClassifier
 from src.utils.config import get_model_config
+from src.utils.gpu import is_gpu_available, get_gpu_params
 
 class ModelFactory:
     @staticmethod
@@ -16,6 +17,13 @@ class ModelFactory:
         
         params = config[model_type].copy()
         params.update(kwargs) # Override with any passed arguments
+        
+        # Auto-detect GPU and apply acceleration parameters
+        if is_gpu_available():
+            gpu_params = get_gpu_params(model_type)
+            if gpu_params:
+                print(f"GPU detected! Applying {model_type} GPU acceleration parameters: {gpu_params}")
+                params.update(gpu_params)
         
         if model_type == "xgboost":
             print(f"Initializing XGBoost with params: {params}")
