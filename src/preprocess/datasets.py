@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta
 from src.data.loader import get_loader
+import numpy as np
 
 class BasePreprocessor:
     def __init__(self, dataset_name):
@@ -57,6 +58,26 @@ class EcommerceFraudPreprocessor(BasePreprocessor):
     def __init__(self):
         super().__init__("fraud_ecommerce")
 
+    def _standardize_ip(self, df):
+        if 'ip_address' in df.columns:
+            print(f"Standardizing IP address values for {self.dataset_name}...")
+            df['ip_address'] = pd.to_numeric(df['ip_address'], errors='coerce')
+            if df['ip_address'].notna().any():
+                min_ip = df['ip_address'].min()
+                max_ip = df['ip_address'].max()
+                if max_ip > min_ip:
+                    df['ip_address'] = (df['ip_address'] - min_ip) / (max_ip - min_ip)
+                else:
+                    df['ip_address'] = 0.0
+        return df
+
+    def _log_transform_amount(self, df, amount_col):
+        if amount_col in df.columns:
+            print(f"Applying log transform to {amount_col} for {self.dataset_name}...")
+            df[amount_col] = pd.to_numeric(df[amount_col], errors='coerce').fillna(0.0)
+            df[amount_col] = np.log1p(df[amount_col].clip(lower=0))
+        return df
+
     def run(self):
         """Pipeline for Ecommerce Fraud: handles string dates, joins with IP mapping, drops id, saves to parquet."""
         # Load raw data
@@ -95,6 +116,10 @@ class EcommerceFraudPreprocessor(BasePreprocessor):
         # Mapping standard columns
         mapping = self.loader.dataset_cfg.get('column_mapping', {})
         df = df.rename(columns=mapping)
+        
+        # Preprocess IP column and purchase amount
+        df = self._standardize_ip(df)
+        df = self._log_transform_amount(df, 'purchase_value')
         
         # Handle time: it's a string '2015-02-24 22:55:49'
         print(f"Converting string time to datetime for {self.dataset_name}...")
