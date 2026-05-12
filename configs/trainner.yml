@@ -1,6 +1,6 @@
 pipeline:
-  mode: "subsample" # Options: "subsample" for testing, "full" for complete dataset
-  init_train_size: 1000 # Number of initial samples to bootstrap the model
+  mode: "full" # Options: "subsample" for testing, "full" for complete dataset
+  init_train_size: 10000 # Number of initial samples to bootstrap the model
   subsample_size: 50000 # Number of records to use when mode is 'subsample'
 
 addm:
