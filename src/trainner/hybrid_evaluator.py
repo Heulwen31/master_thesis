@@ -35,7 +35,11 @@ class HybridEvaluator(BaseEvaluator):
         self.nn_short = NearestNeighbors(n_neighbors=self.k, n_jobs=-1)
         self.buffer_short_X = None
             
-        self.active_trigger = None
+        self.active_triggers = []
+        self.long_retraining_start_idx = None
+        self.short_retraining_start_idx = None
+        self.last_long_is_correct = None
+        self.last_short_is_correct = None
 
     def init_train(self, initial_train_size=None):
         """Bootstrap training for both models."""
@@ -73,6 +77,15 @@ class HybridEvaluator(BaseEvaluator):
         # Fill NaNs for query sample
         X_test_val = X_test_df.fillna(0).values if hasattr(X_test_df, 'fillna') else np.nan_to_num(X_test_df, nan=0)
         y_true = self.y[i]
+
+        proba_short = self.model_short.predict_proba(X_test_df)[0]
+        proba_long = self.model_long.predict_proba(X_test_df)[0]
+        p_short = proba_short[1]
+        p_long = proba_long[1]
+        pred_short = 1 if p_short >= 0.5 else 0
+        pred_long = 1 if p_long >= 0.5 else 0
+        self.last_short_is_correct = 1 if pred_short == y_true else 0
+        self.last_long_is_correct = 1 if pred_long == y_true else 0
         
         # 1. Search in Short Buffer
         d_short, _ = self.nn_short.kneighbors(X_test_val)
@@ -85,10 +98,10 @@ class HybridEvaluator(BaseEvaluator):
         # Logic: Switching or Ensemble
         if min_d_short <= self.thresh:
             # Trusted Short Model
-            y_prob = self.model_short.predict_proba(X_test_df)[0][1]
+            y_prob = p_short
         elif min_d_long <= self.thresh:
             # Trusted Long Model
-            y_prob = self.model_long.predict_proba(X_test_df)[0][1]
+            y_prob = p_long
         else:
             # Combine based on inverse distance weights
             avg_d_short = np.mean(d_short[0])
@@ -103,8 +116,6 @@ class HybridEvaluator(BaseEvaluator):
             w_short /= total_w
             w_long /= total_w
             
-            p_short = self.model_short.predict_proba(X_test_df)[0][1]
-            p_long = self.model_long.predict_proba(X_test_df)[0][1]
             y_prob = w_short * p_short + w_long * p_long
             
         y_pred = 1 if y_prob >= 0.5 else 0
@@ -112,19 +123,39 @@ class HybridEvaluator(BaseEvaluator):
 
     def check_drift(self, is_correct):
         """Checks both triggers."""
-        if self.long_term_eval.check_drift(is_correct):
-            self.active_trigger = self.long_term_eval
-            return True
-        if self.short_term_eval.check_drift(is_correct):
-            self.active_trigger = self.short_term_eval
-            return True
-        return False
+        self.active_triggers = []
+        long_is_correct = self.last_long_is_correct
+        short_is_correct = self.last_short_is_correct
+
+        if long_is_correct is None:
+            long_is_correct = is_correct
+        if short_is_correct is None:
+            short_is_correct = is_correct
+
+        long_triggered = self.long_term_eval.check_drift(long_is_correct)
+        short_triggered = self.short_term_eval.check_drift(short_is_correct)
+
+        if long_triggered:
+            self.active_triggers.append("long")
+        if short_triggered:
+            self.active_triggers.append("short")
+
+        return bool(self.active_triggers)
 
     def retrain(self, i, retraining_start_idx):
         """Handles retraining and updates the respective NN index."""
-        if self.active_trigger == self.long_term_eval:
+        if self.long_retraining_start_idx is None:
+            self.long_retraining_start_idx = retraining_start_idx
+        if self.short_retraining_start_idx is None:
+            self.short_retraining_start_idx = retraining_start_idx
+
+        retraining_points = []
+
+        if "long" in self.active_triggers:
             print(f"Hybrid: [LONG-TERM] Periodic retrain triggered at index {i}...")
-            res_idx = self.long_term_eval.retrain(i, retraining_start_idx)
+            res_idx = self.long_term_eval.retrain(i, self.long_retraining_start_idx)
+            self.model_long = self.long_term_eval.model
+            retraining_points.append(res_idx)
             
             # Update Long Buffer and NN Index (from index 0 to i)
             if hasattr(self.X, 'iloc'):
@@ -134,16 +165,16 @@ class HybridEvaluator(BaseEvaluator):
             # Fill NaNs for NN
             self.buffer_long_X = X_batch.fillna(0).values if hasattr(X_batch, 'fillna') else np.nan_to_num(X_batch, nan=0)
             self.nn_long.fit(self.buffer_long_X)
-            
-            # Sync Short-term
-            if hasattr(self.short_term_eval, 'addm'):
-                self.short_term_eval.addm.reset()
-            if hasattr(self.short_term_eval, 'steps_since_last_update'):
-                self.short_term_eval.steps_since_last_update = 0
-            return res_idx
-        else:
-            # Short-term retrain
-            res_idx = self.short_term_eval.retrain(i, retraining_start_idx)
+
+            self.long_retraining_start_idx = i + 1
+
+        if "short" in self.active_triggers:
+            reason = getattr(self.short_term_eval, 'trigger_reason', None)
+            reason_label = f" {reason}" if reason else ""
+            print(f"Hybrid: [SHORT-TERM]{reason_label} retrain triggered at index {i}...")
+            res_idx = self.short_term_eval.retrain(i, self.short_retraining_start_idx)
+            self.model_short = self.short_term_eval.model
+            retraining_points.append(res_idx)
             
             # Update Short Buffer and NN Index
             if hasattr(self.X, 'iloc'):
@@ -153,5 +184,8 @@ class HybridEvaluator(BaseEvaluator):
             # Fill NaNs for NN
             self.buffer_short_X = X_batch.fillna(0).values if hasattr(X_batch, 'fillna') else np.nan_to_num(X_batch, nan=0)
             self.nn_short.fit(self.buffer_short_X)
-            
-            return res_idx
+
+            self.short_retraining_start_idx = i + 1
+
+        self.active_triggers = []
+        return min(retraining_points) if retraining_points else retraining_start_idx

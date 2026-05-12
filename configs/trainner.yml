@@ -6,7 +6,12 @@ pipeline:
 addm:
   hoeffding_delta: 0.01
   min_window_size: 30
-  entropy_threshold: 0.99
+  entropy_threshold: 0.75
+  fallback_interval: 100 # Retrain if ADDM does not detect drift after N samples
+  fallback_window: "adaptive" # Options: "adaptive", "fixed"
+  fixed_train_size: 1000
+  min_train_size: 500
+  max_train_size: 5000
 
 periodic:
   retrain_interval: 1000 # Long-term full retrain interval
@@ -19,5 +24,3 @@ hybrid:
   short_term_method: "addm" # Options: "addm", "incremental"
   similarity_threshold: 0.1  # Threshold for direct model selection
   k_neighbors: 3             # Number of neighbors for weighted ensemble
-
-
