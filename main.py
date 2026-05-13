@@ -39,7 +39,7 @@ def main():
         df = df.sort_values(by='time')
         df = df.drop(columns=['time'])
         
-    if mode == "subsample" and not args.use_sampled:
+    if mode == "subsample":
         size = pipeline_config.get("subsample_size", 50000)
         print(f"⚠️  SUBSAMPLE mode: taking first {size} records.")
         df = df.head(size)
@@ -102,6 +102,9 @@ def main():
             print(f"Processed samples: {i}/{n_samples}...", end="\r")
 
     # 5. Generate Final Report
+    if args.method == "hybrid" and hasattr(evaluator, 'print_stats'):
+        evaluator.print_stats()
+        
     reporter.generate_report()
 
 if __name__ == "__main__":

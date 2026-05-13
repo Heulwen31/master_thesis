@@ -40,6 +40,11 @@ class HybridEvaluator(BaseEvaluator):
         self.short_retraining_start_idx = None
         self.last_long_is_correct = None
         self.last_short_is_correct = None
+        
+        # Statistics
+        self.count_long = 0
+        self.count_short = 0
+        self.count_ensemble = 0
 
     def init_train(self, initial_train_size=None):
         """Bootstrap training for both models."""
@@ -99,9 +104,11 @@ class HybridEvaluator(BaseEvaluator):
         if min_d_short <= self.thresh:
             # Trusted Short Model
             y_prob = p_short
+            self.count_short += 1
         elif min_d_long <= self.thresh:
             # Trusted Long Model
             y_prob = p_long
+            self.count_long += 1
         else:
             # Combine based on inverse distance weights
             avg_d_short = np.mean(d_short[0])
@@ -117,9 +124,24 @@ class HybridEvaluator(BaseEvaluator):
             w_long /= total_w
             
             y_prob = w_short * p_short + w_long * p_long
+            self.count_ensemble += 1
             
         y_pred = 1 if y_prob >= 0.5 else 0
         return y_true, y_pred, y_prob
+
+    def print_stats(self):
+        """Prints prediction model usage statistics."""
+        total = self.count_short + self.count_long + self.count_ensemble
+        if total == 0: return
+        
+        print("\n" + "═"*40)
+        print(f"║ {'HYBRID PREDICTION STATS':^36} ║")
+        print("═"*40)
+        print(f"║ Short-term Only : {self.count_short:>10} ({self.count_short/total:>6.1%}) ║")
+        print(f"║ Long-term Only  : {self.count_long:>10} ({self.count_long/total:>6.1%}) ║")
+        print(f"║ Ensemble        : {self.count_ensemble:>10} ({self.count_ensemble/total:>6.1%}) ║")
+        print(f"║ Total Predicts  : {total:>10}          ║")
+        print("═"*40)
 
     def check_drift(self, is_correct):
         """Checks both triggers."""
