@@ -1,24 +1,24 @@
 pipeline:
-  mode: "full" # Options: "subsample" for testing, "full" for complete dataset
-  init_train_size: 50000 # Number of initial samples to bootstrap the model
-  subsample_size: 50000 # Number of records to use when mode is 'subsample'
+  mode: "subsample" # Options: "subsample" for testing, "full" for complete dataset
+  init_train_size: 10000 # Number of initial samples to bootstrap the model
+  subsample_size: 100000 # Number of records to use when mode is 'subsample'
 
 addm:
   hoeffding_delta: 0.01
   min_window_size: 30
   entropy_threshold: 0.75
-  fallback_interval: 1000 # Tăng từ 100: Retrain if ADDM does not detect drift sau N samples
+  fallback_interval: 100 # Tăng từ 100: Retrain if ADDM does not detect drift sau N samples
   fallback_window: "adaptive" # Options: "adaptive", "fixed"
   fixed_train_size: 1000
   min_train_size: 500
   max_train_size: 5000
 
 periodic:
-  retrain_interval: 5000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
+  retrain_interval: 1000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
 
 incremental:
-  update_interval: 1000  # Tăng từ 100: Tăng số lượng mẫu thu thập trước khi cập nhật ngắn hạn
-  update_trees: 50       # Giảm từ 500: Số lượng cây mới thêm vào (giảm bớt để tránh phình mô hình)
+  update_interval: 200  # Tăng từ 100: Tăng số lượng mẫu thu thập trước khi cập nhật ngắn hạn
+  update_trees: 500       # Giảm từ 500: Số lượng cây mới thêm vào (giảm bớt để tránh phình mô hình)
 
 hybrid:
   short_term_method: "addm" # Options: "addm", "incremental"
