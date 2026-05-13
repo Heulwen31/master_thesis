@@ -78,11 +78,6 @@ class BaseEvaluator:
             X_extra = self.X[extra_idx]
         y_extra = self.y[extra_idx]
 
-        print(
-            f"Retrain batch has one class ({unique_classes[0]}). "
-            f"Added {len(extra_idx)} samples from class {missing_class}."
-        )
-
         if isinstance(X_batch, pd.DataFrame):
             X_batch = pd.concat([X_batch, X_extra])
             y_batch = np.concatenate([y_batch, y_extra])
