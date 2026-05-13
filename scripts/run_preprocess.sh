@@ -35,4 +35,4 @@ done
 # Run the preprocessing script
 echo "Running data preprocessing for dataset: $DATASET"
 export PYTHONPATH=$PYTHONPATH:.
-python3 scripts/run_preprocess.py --dataset "$DATASET"
+python3 src/preprocess/orchestrator.py --dataset "$DATASET"

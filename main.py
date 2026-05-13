@@ -27,23 +27,24 @@ def main():
     
     # 1. Load Data
     data_path = os.path.join("data", "processed", f"{args.dataset}.parquet")
+    
     if not os.path.exists(data_path):
-        print(f"❌ Error: Processed data not found at {data_path}. Please run preprocessing first.")
+        print(f"❌ Error: Data not found at {data_path}. Please run preprocessing first.")
         sys.exit(1)
         
-    print(f"Loading {args.dataset} data...")
+    print(f"Loading {args.dataset} data from {data_path}...")
     df = pd.read_parquet(data_path)
     
     if 'time' in df.columns:
         df = df.sort_values(by='time')
         df = df.drop(columns=['time'])
         
-    if mode == "subsample":
-        subsample_size = pipeline_config.get("subsample_size", 50000)
-        print(f"⚠️  Running in SUBSAMPLE mode: taking first {subsample_size} records.")
-        df = df.head(subsample_size)
+    if mode == "subsample" and not args.use_sampled:
+        size = pipeline_config.get("subsample_size", 50000)
+        print(f"⚠️  SUBSAMPLE mode: taking first {size} records.")
+        df = df.head(size)
     else:
-        print(f"✅ Running in FULL mode: using all {len(df)} records.")
+        print(f"✅ Using {len(df)} records.")
 
     # Convert non-numeric columns to categorical codes for better compatibility
     cat_cols = df.select_dtypes(exclude=['number', 'bool']).columns

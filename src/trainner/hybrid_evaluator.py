@@ -152,7 +152,7 @@ class HybridEvaluator(BaseEvaluator):
         retraining_points = []
 
         if "long" in self.active_triggers:
-            print(f"Hybrid: [LONG-TERM] Periodic retrain triggered at index {i}...")
+            # print(f"Hybrid: [LONG-TERM] Periodic retrain triggered at index {i}...")
             res_idx = self.long_term_eval.retrain(i, self.long_retraining_start_idx)
             self.model_long = self.long_term_eval.model
             retraining_points.append(res_idx)
@@ -171,7 +171,7 @@ class HybridEvaluator(BaseEvaluator):
         if "short" in self.active_triggers:
             reason = getattr(self.short_term_eval, 'trigger_reason', None)
             reason_label = f" {reason}" if reason else ""
-            print(f"Hybrid: [SHORT-TERM]{reason_label} retrain triggered at index {i}...")
+            # print(f"Hybrid: [SHORT-TERM]{reason_label} retrain triggered at index {i}...")
             res_idx = self.short_term_eval.retrain(i, self.short_retraining_start_idx)
             self.model_short = self.short_term_eval.model
             retraining_points.append(res_idx)

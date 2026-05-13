@@ -3,7 +3,7 @@ import os
 import argparse
 
 # Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from src.preprocess.datasets import CreditCardPreprocessor, IEEECISPreprocessor, EcommerceFraudPreprocessor
 

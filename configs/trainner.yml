@@ -1,7 +1,10 @@
 pipeline:
-  mode: "subsample" # Options: "subsample" for testing, "full" for complete dataset
-  init_train_size: 10000 # Number of initial samples to bootstrap the model
-  subsample_size: 100000 # Number of records to use when mode is 'subsample'
+  mode: "full" # Options: "subsample", "full" (Nếu đã chạy run_undersampling.sh thì file gốc đã được giảm mẫu)
+  init_train_size: 10000
+  subsample_size: 100000
+  sampling:
+    target_majority_ratio: 0.90 # Lớp đa số chiếm n%
+    min_total_samples: 50000    # Số mẫu tối thiểu giữ lại
 
 addm:
   hoeffding_delta: 0.01
