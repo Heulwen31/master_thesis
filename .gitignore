@@ -122,6 +122,11 @@ data/processed/
 *.zip
 *.gz
 
+# Project outputs (reports, results, models)
+outputs/
+*.json
+results/
+
 # macOS
 .DS_Store
 .AppleDouble

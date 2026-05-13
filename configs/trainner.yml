@@ -18,7 +18,7 @@ periodic:
 
 incremental:
   update_interval: 200  # Tăng từ 100: Tăng số lượng mẫu thu thập trước khi cập nhật ngắn hạn
-  update_trees: 500       # Giảm từ 500: Số lượng cây mới thêm vào (giảm bớt để tránh phình mô hình)
+  update_trees: 1000       # Giảm từ 500: Số lượng cây mới thêm vào (giảm bớt để tránh phình mô hình)
 
 hybrid:
   short_term_method: "addm" # Options: "addm", "incremental"
