@@ -105,7 +105,9 @@ def main():
     if args.method == "hybrid" and hasattr(evaluator, 'print_stats'):
         evaluator.print_stats()
         
-    reporter.generate_report()
+    # Pass evaluation features for error analysis
+    X_eval = X_df.iloc[initial_size:]
+    reporter.generate_report(X_eval=X_eval)
 
 if __name__ == "__main__":
     sys.dont_write_bytecode = True

@@ -2,6 +2,8 @@ import json
 import os
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, roc_auc_score, average_precision_score
 
 class DriftReporter:
@@ -29,7 +31,63 @@ class DriftReporter:
             'retrained_from': int(retraining_point)
         })
 
-    def generate_report(self):
+    def _generate_visualizations(self, y_true, y_pred, y_prob, X_eval):
+        """Generates diagnostic plots for error analysis."""
+        os.makedirs("outputs/plots", exist_ok=True)
+        is_correct = (y_pred == y_true)
+        
+        # 1. Error Timeline & Drift Points
+        plt.figure(figsize=(15, 5))
+        plt.plot(np.convolve(is_correct, np.ones(100)/100, mode='valid'), label='Rolling Accuracy (Window=100)')
+        if X_eval is not None:
+            for drift in self.drifts:
+                plt.axvline(x=drift['detected_at'] - (len(X_eval) - len(is_correct)), color='r', alpha=0.3, linestyle='--')
+        plt.title(f"Evaluation Accuracy Timeline - {self.dataset_name}")
+        plt.xlabel("Sample Index")
+        plt.ylabel("Accuracy")
+        plt.legend()
+        plt.savefig(f"outputs/plots/timeline_{self.dataset_name}.png")
+        plt.close()
+
+        # 2. Probability Distribution for Errors vs Successes
+        plt.figure(figsize=(10, 6))
+        sns.kdeplot(y_prob[is_correct], label='Correct Predictions', fill=True, alpha=0.5)
+        sns.kdeplot(y_prob[~is_correct], label='Errors', fill=True, alpha=0.5)
+        plt.title("Probability Distribution: Correct vs Incorrect")
+        plt.xlabel("Predicted Probability (Class 1)")
+        plt.ylabel("Density")
+        plt.legend()
+        plt.savefig(f"outputs/plots/prob_dist_{self.dataset_name}.png")
+        plt.close()
+
+        # 3. Confidence vs Error (Margin analysis)
+        confidence = np.abs(y_prob - 0.5) * 2
+        plt.figure(figsize=(10, 6))
+        sns.boxplot(x=is_correct, y=confidence)
+        plt.title("Confidence (Margin) for Correct vs Incorrect Predictions")
+        plt.xticks([0, 1], ['Incorrect', 'Correct'])
+        plt.ylabel("Confidence (|p-0.5|*2)")
+        plt.savefig(f"outputs/plots/confidence_analysis_{self.dataset_name}.png")
+        plt.close()
+
+        # 4. Feature Analysis for Errors (Top 5 features)
+        if X_eval is not None:
+            num_cols = X_eval.select_dtypes(include=[np.number]).columns[:5]
+            if len(num_cols) > 0:
+                fig, axes = plt.subplots(1, len(num_cols), figsize=(20, 5))
+                if len(num_cols) == 1: axes = [axes]
+                
+                for i, col in enumerate(num_cols):
+                    sns.kdeplot(X_eval.iloc[is_correct][col], ax=axes[i], label='Correct', fill=True, alpha=0.3)
+                    sns.kdeplot(X_eval.iloc[~is_correct][col], ax=axes[i], label='Error', fill=True, alpha=0.3)
+                    axes[i].set_title(f"Dist: {col}")
+                    axes[i].legend()
+                
+                plt.tight_layout()
+                plt.savefig(f"outputs/plots/feature_error_analysis_{self.dataset_name}.png")
+                plt.close()
+
+    def generate_report(self, X_eval=None):
         """Calculates final metrics, saves to JSON, and prints a summary."""
         y_true = np.array(self.ground_truth)
         y_pred = np.array(self.predictions)
@@ -69,6 +127,10 @@ class DriftReporter:
         with open(filename, 'w') as f:
             json.dump(results, f, indent=4)
 
+        # Generate Diagnostic Plots
+        print("Generating diagnostic visualizations...")
+        self._generate_visualizations(y_true, y_pred, y_prob, X_eval)
+
         print("\n" + "═"*60)
         print(f"║ {'FINAL EVALUATION REPORT':^56} ║")
         print("═"*60)
@@ -88,6 +150,7 @@ class DriftReporter:
         print("╟" + "─"*58 + "╢")
         print(f"║ Total Drifts : {len(self.drifts):>41} ║")
         print(f"║ Full report saved to: {filename:<29} ║")
+        print(f"║ Visualizations saved to: outputs/plots/             ║")
         print("═"*60 + "\n")
         
         return results
