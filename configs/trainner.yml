@@ -6,15 +6,9 @@ pipeline:
     target_majority_ratio: 0.90 # Lớp đa số chiếm n%
     min_total_samples: 50000    # Số mẫu tối thiểu giữ lại
 
-addm:
-  hoeffding_delta: 0.01
-  min_window_size: 30
-  entropy_threshold: 0.75
-  fallback_interval: 100 # Tăng từ 100: Retrain if ADDM does not detect drift sau N samples
-  fallback_window: "adaptive" # Options: "adaptive", "fixed"
-  fixed_train_size: 1000
-  min_train_size: 500
-  max_train_size: 5000
+sliding:
+  window_size: 1000
+  retrain_interval: 200
 
 periodic:
   retrain_interval: 1000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
@@ -24,6 +18,8 @@ incremental:
   update_trees: 1000       # Giảm từ 500: Số lượng cây mới thêm vào (giảm bớt để tránh phình mô hình)
 
 hybrid:
-  short_term_method: "addm" # Options: "addm", "incremental"
-  similarity_threshold: 0.01  # Threshold for direct model selection
+  short_term_method: "sliding" # Options: "sliding", "incremental"
+  similarity_threshold: 0.1  # Threshold for direct model selection
   k_neighbors: 3             # Number of neighbors for weighted ensemble
+  weight_short: 1.0
+  weight_long: 1.0

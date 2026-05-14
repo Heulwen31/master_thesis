@@ -8,7 +8,7 @@
 # Default values
 DATASET="ieee_cis"
 MODEL="xgboost"
-METHOD="addm"
+METHOD="sliding"
 
 # Parse command line arguments
 while [[ "$#" -gt 0 ]]; do
@@ -20,7 +20,7 @@ while [[ "$#" -gt 0 ]]; do
             echo "Usage: ./scripts/run_main.sh [--dataset DATASET] [--model MODEL] [--method METHOD]"
             echo "  --dataset : Name of dataset to process (default: ieee_cis). Choices: ieee_cis, creditcard, fraud_ecommerce."
             echo "  --model   : Name of the model to evaluate (default: xgboost). Choices: xgboost, lightgbm, catboost."
-            echo "  --method  : Evaluation method (default: addm). Choices: addm, periodic, incremental, hybrid."
+            echo "  --method  : Evaluation method (default: sliding). Choices: sliding, periodic, incremental, hybrid."
             exit 0
             ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
@@ -34,7 +34,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT" || exit 1
 
 echo "================================================================="
-echo "🚀 Starting ADDM Training & Evaluation Pipeline"
+echo "🚀 Starting Sliding Window Training & Evaluation Pipeline"
 echo "================================================================="
 
 # Set PYTHONPATH to include the project root

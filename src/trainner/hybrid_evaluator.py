@@ -3,7 +3,7 @@ import pandas as pd
 import copy
 from sklearn.neighbors import NearestNeighbors
 from src.trainner.base_evaluator import BaseEvaluator
-from src.trainner.online_evaluator import OnlineEvaluator
+from src.trainner.sliding_evaluator import SlidingEvaluator
 from src.trainner.periodic_evaluator import PeriodicEvaluator
 from src.trainner.incremental_evaluator import IncrementalEvaluator
 
@@ -19,6 +19,8 @@ class HybridEvaluator(BaseEvaluator):
         self.short_term_method = hybrid_config.get("short_term_method", "incremental")
         self.thresh = hybrid_config.get("similarity_threshold", 0.1)
         self.k = hybrid_config.get("k_neighbors", 3)
+        self.weight_short = hybrid_config.get("weight_short", 1.0)
+        self.weight_long = hybrid_config.get("weight_long", 1.0)
         
         # 1. Long-term component (Stable model)
         self.model_long = copy.deepcopy(model)
@@ -28,8 +30,8 @@ class HybridEvaluator(BaseEvaluator):
         
         # 2. Short-term component (Adaptive model)
         self.model_short = copy.deepcopy(model)
-        if self.short_term_method == "addm":
-            self.short_term_eval = OnlineEvaluator(self.model_short, X, y)
+        if self.short_term_method == "sliding":
+            self.short_term_eval = SlidingEvaluator(self.model_short, X, y)
         else:
             self.short_term_eval = IncrementalEvaluator(self.model_short, X, y)
         self.nn_short = NearestNeighbors(n_neighbors=self.k, n_jobs=-1)
@@ -115,8 +117,8 @@ class HybridEvaluator(BaseEvaluator):
             avg_d_long = np.mean(d_long[0])
             
             eps = 1e-8
-            w_short = 1.0 / (avg_d_short + eps)
-            w_long = 1.0 / (avg_d_long + eps)
+            w_short = self.weight_short / (avg_d_short + eps)
+            w_long = self.weight_long / (avg_d_long + eps)
             
             # Normalize weights
             total_w = w_short + w_long
