@@ -71,7 +71,7 @@ def main():
     elif args.method == "hybrid":
         evaluator = HybridEvaluator(model, X_df, y)
         
-    reporter = DriftReporter(args.dataset, args.model)
+    reporter = DriftReporter(args.dataset, args.model, args.method)
     
     # 3. Initial Training (Warm-up)
     initial_size = evaluator.init_train()

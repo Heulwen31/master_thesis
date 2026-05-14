@@ -10,9 +10,10 @@ class DriftReporter:
     """
     Handles collecting metrics and generating a detailed report for the evaluation.
     """
-    def __init__(self, dataset_name, model_name):
+    def __init__(self, dataset_name, model_name, method_name):
         self.dataset_name = dataset_name
         self.model_name = model_name
+        self.method_name = method_name
         self.predictions = []
         self.probabilities = []
         self.ground_truth = []
@@ -35,6 +36,7 @@ class DriftReporter:
         """Generates diagnostic plots for error analysis."""
         os.makedirs("outputs/plots", exist_ok=True)
         is_correct = (y_pred == y_true)
+        prefix = f"{self.method_name}_{self.dataset_name}"
         
         # 1. Error Timeline, Fraud Rate & Drift Points
         fig, ax1 = plt.subplots(figsize=(15, 6))
@@ -63,7 +65,7 @@ class DriftReporter:
                            color='gray', alpha=0.4, linestyle=':', label=label)
                 first_drift = False
                 
-        plt.title(f"Evaluation Performance & Fraud Prevalence - {self.dataset_name}", fontsize=14, pad=20)
+        plt.title(f"Performance & Fraud Prevalence - {self.dataset_name} ({self.method_name.upper()})", fontsize=14, pad=20)
         
         # Combine legends from both axes
         lines_1, labels_1 = ax1.get_legend_handles_labels()
@@ -71,28 +73,28 @@ class DriftReporter:
         ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3)
         
         plt.tight_layout()
-        plt.savefig(f"outputs/plots/timeline_{self.dataset_name}.png", bbox_inches='tight', dpi=150)
+        plt.savefig(f"outputs/plots/timeline_{prefix}.png", bbox_inches='tight', dpi=150)
         plt.close()
 
         # 2. Probability Distribution for Errors vs Successes
         plt.figure(figsize=(10, 6))
         sns.kdeplot(y_prob[is_correct], label='Correct Predictions', fill=True, alpha=0.5)
         sns.kdeplot(y_prob[~is_correct], label='Errors', fill=True, alpha=0.5)
-        plt.title("Probability Distribution: Correct vs Incorrect")
+        plt.title(f"Prob Distribution: Correct vs Incorrect ({self.method_name.upper()})")
         plt.xlabel("Predicted Probability (Class 1)")
         plt.ylabel("Density")
         plt.legend()
-        plt.savefig(f"outputs/plots/prob_dist_{self.dataset_name}.png")
+        plt.savefig(f"outputs/plots/prob_dist_{prefix}.png")
         plt.close()
 
         # 3. Confidence vs Error (Margin analysis)
         confidence = np.abs(y_prob - 0.5) * 2
         plt.figure(figsize=(10, 6))
         sns.boxplot(x=is_correct, y=confidence)
-        plt.title("Confidence (Margin) for Correct vs Incorrect Predictions")
+        plt.title(f"Confidence (Margin) for Correct vs Incorrect ({self.method_name.upper()})")
         plt.xticks([0, 1], ['Incorrect', 'Correct'])
         plt.ylabel("Confidence (|p-0.5|*2)")
-        plt.savefig(f"outputs/plots/confidence_analysis_{self.dataset_name}.png")
+        plt.savefig(f"outputs/plots/confidence_analysis_{prefix}.png")
         plt.close()
 
         # 4. Feature Analysis for Errors (Top 5 features)
@@ -109,7 +111,7 @@ class DriftReporter:
                     axes[i].legend()
                 
                 plt.tight_layout()
-                plt.savefig(f"outputs/plots/feature_error_analysis_{self.dataset_name}.png")
+                plt.savefig(f"outputs/plots/feature_error_analysis_{prefix}.png")
                 plt.close()
 
     def generate_report(self, X_eval=None):
@@ -134,6 +136,7 @@ class DriftReporter:
         results = {
             "dataset": self.dataset_name,
             "model": self.model_name,
+            "method": self.method_name,
             "metrics": {
                 "accuracy": acc,
                 "precision": prec,
@@ -148,12 +151,12 @@ class DriftReporter:
 
         # Save to JSON
         os.makedirs("outputs", exist_ok=True)
-        filename = f"outputs/report_{self.dataset_name}_{self.model_name}.json"
+        filename = f"outputs/report_{self.method_name}_{self.dataset_name}_{self.model_name}.json"
         with open(filename, 'w') as f:
             json.dump(results, f, indent=4)
 
         # Generate Diagnostic Plots
-        print("Generating diagnostic visualizations...")
+        print(f"Generating diagnostic visualizations for {self.method_name}...")
         self._generate_visualizations(y_true, y_pred, y_prob, X_eval)
 
         print("\n" + "═"*60)
@@ -161,6 +164,7 @@ class DriftReporter:
         print("═"*60)
         print(f"║ Dataset      : {self.dataset_name:<41} ║")
         print(f"║ Model        : {self.model_name:<41} ║")
+        print(f"║ Method       : {self.method_name:<41} ║")
         print("╟" + "─"*58 + "╢")
         print(f"║ {'METRICS':^56} ║")
         print("╟" + "─"*58 + "╢")
@@ -174,7 +178,7 @@ class DriftReporter:
         print(f"║ {'DRIFT ANALYSIS':^56} ║")
         print("╟" + "─"*58 + "╢")
         print(f"║ Total Drifts : {len(self.drifts):>41} ║")
-        print(f"║ Full report saved to: {filename:<29} ║")
+        print(f"║ Full report saved to: {os.path.basename(filename):<29} ║")
         print(f"║ Visualizations saved to: outputs/plots/             ║")
         print("═"*60 + "\n")
         
