@@ -36,17 +36,42 @@ class DriftReporter:
         os.makedirs("outputs/plots", exist_ok=True)
         is_correct = (y_pred == y_true)
         
-        # 1. Error Timeline & Drift Points
-        plt.figure(figsize=(15, 5))
-        plt.plot(np.convolve(is_correct, np.ones(100)/100, mode='valid'), label='Rolling Accuracy (Window=100)')
+        # 1. Error Timeline, Fraud Rate & Drift Points
+        fig, ax1 = plt.subplots(figsize=(15, 6))
+        
+        # Accuracy plot (Primary Y-axis)
+        rolling_acc = np.convolve(is_correct, np.ones(100)/100, mode='valid')
+        ax1.plot(rolling_acc, color='#1f77b4', label='Rolling Accuracy (Window=100)', linewidth=1.5)
+        ax1.set_xlabel("Sample Index", fontsize=10)
+        ax1.set_ylabel("Accuracy", color='#1f77b4', fontsize=10)
+        ax1.tick_params(axis='y', labelcolor='#1f77b4')
+        ax1.grid(True, alpha=0.3)
+        
+        # Fraud Rate plot (Secondary Y-axis)
+        ax2 = ax1.twinx()
+        rolling_fraud = np.convolve(y_true, np.ones(100)/100, mode='valid')
+        ax2.plot(rolling_fraud, color='#d62728', alpha=0.6, label='Rolling Fraud Rate', linewidth=1.2, linestyle='--')
+        ax2.set_ylabel("Fraud Rate", color='#d62728', fontsize=10)
+        ax2.tick_params(axis='y', labelcolor='#d62728')
+        
+        # Drift vertical lines
         if X_eval is not None:
+            first_drift = True
             for drift in self.drifts:
-                plt.axvline(x=drift['detected_at'] - (len(X_eval) - len(is_correct)), color='r', alpha=0.3, linestyle='--')
-        plt.title(f"Evaluation Accuracy Timeline - {self.dataset_name}")
-        plt.xlabel("Sample Index")
-        plt.ylabel("Accuracy")
-        plt.legend()
-        plt.savefig(f"outputs/plots/timeline_{self.dataset_name}.png")
+                label = 'Drift Detected' if first_drift else ""
+                ax1.axvline(x=drift['detected_at'] - (len(X_eval) - len(is_correct)), 
+                           color='gray', alpha=0.4, linestyle=':', label=label)
+                first_drift = False
+                
+        plt.title(f"Evaluation Performance & Fraud Prevalence - {self.dataset_name}", fontsize=14, pad=20)
+        
+        # Combine legends from both axes
+        lines_1, labels_1 = ax1.get_legend_handles_labels()
+        lines_2, labels_2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3)
+        
+        plt.tight_layout()
+        plt.savefig(f"outputs/plots/timeline_{self.dataset_name}.png", bbox_inches='tight', dpi=150)
         plt.close()
 
         # 2. Probability Distribution for Errors vs Successes
