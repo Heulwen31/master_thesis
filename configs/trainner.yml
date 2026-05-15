@@ -8,7 +8,8 @@ pipeline:
 
 sliding:
   window_size: 1000
-  retrain_interval: 200
+  retrain_interval: 10
+  max_models: 5
 
 periodic:
   retrain_interval: 1000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
@@ -23,3 +24,8 @@ hybrid:
   k_neighbors: 3             # Number of neighbors for weighted ensemble
   weight_short: 1.0
   weight_long: 2.0
+  use_metaheuristic: true    # Enable metaheuristic optimization
+  metaheuristic_metric: "f1" # Metric to optimize: "f1", "log_loss"
+  metaheuristic_bounds:      # Search space for [weight_short, weight_long]
+    weight_short: [0.1, 5.0]
+    weight_long:  [0.1, 5.0]
