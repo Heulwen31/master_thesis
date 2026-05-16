@@ -7,8 +7,8 @@ pipeline:
     min_total_samples: 50000    # Số mẫu tối thiểu giữ lại
 
 sliding:
-  window_size: 1000
-  retrain_interval: 10
+  window_size: 5000          # Tăng từ 1000 lên 5000 để bắt được nhiều mẫu fraud hơn
+  retrain_interval: 500      # Tăng từ 50 lên 500 để giảm nhiễu và số lần retrain vô ích
   max_models: 5
 
 periodic:
@@ -27,5 +27,18 @@ hybrid:
   use_metaheuristic: true    # Enable metaheuristic optimization
   metaheuristic_metric: "f1" # Metric to optimize: "f1", "log_loss"
   metaheuristic_bounds:      # Search space for [weight_short, weight_long]
-    weight_short: [0.1, 5.0]
-    weight_long:  [0.1, 5.0]
+    weight_short: [0.01, 10.0]
+    weight_long:  [0.1, 10.0]
+  pso_gwo:
+    pop_size: 20       # Tăng từ 10: Tăng số lượng hạt để khám phá không gian tốt hơn
+    max_iter: 50       # Tăng từ 20: Tăng số lần lặp để hội tụ sâu hơn
+    w_max: 0.9         # Trọng lượng quán tính cực đại
+    w_min: 0.4         # Trọng lượng quán tính cực tiểu
+    c1: 2.0
+    c2: 2.0
+  trend_aware:
+    enabled: true
+    short_window: 100
+    long_window: 500
+    boost_factor: 2.0   # Tăng từ 1.5: Phản ứng mạnh hơn khi có xu hướng
+    sensitivity: 1.15   # Ngưỡng kích hoạt (1.15 = 15% thay đổi)

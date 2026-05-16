@@ -98,8 +98,10 @@ def main():
             reporter.add_drift(i, retraining_point)
             retraining_start_idx = i + 1
             
-        if i % 1000 == 0:
-            print(f"Processed samples: {i}/{n_samples}...", end="\r")
+        if i % 100 == 0 or i == n_samples - 1:
+            percentage = ((i + 1) / n_samples) * 100
+            print(f"Processed samples: {percentage:6.1f}% ({i+1}/{n_samples})   ", end="\r")
+    print()
 
     # 5. Generate Final Report
     if args.method == "hybrid" and hasattr(evaluator, 'print_stats'):
