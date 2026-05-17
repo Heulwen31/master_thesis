@@ -1,7 +1,7 @@
 pipeline:
-  mode: "full" # Options: "subsample", "full" (Nếu đã chạy run_undersampling.sh thì file gốc đã được giảm mẫu)
-  init_train_size: 1000
-  subsample_size: 10000
+  mode: "subsample" # Options: "subsample", "full" (Nếu đã chạy run_undersampling.sh thì file gốc đã được giảm mẫu)
+  init_train_size: 10000
+  subsample_size: 20000
   sampling:
     target_majority_ratio: 0.90 # Lớp đa số chiếm n%
     min_total_samples: 50000    # Số mẫu tối thiểu giữ lại
@@ -11,7 +11,7 @@ sliding:
   retrain_interval: 200
 
 periodic:
-  retrain_interval: 1000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
+  retrain_interval: 5000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
 
 incremental:
   update_interval: 200  # Tăng từ 100: Tăng số lượng mẫu thu thập trước khi cập nhật ngắn hạn
