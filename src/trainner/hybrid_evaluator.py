@@ -4,7 +4,6 @@ from src.trainner.periodic_evaluator import PeriodicEvaluator
 class HybridEvaluator(BaseEvaluator):
     """
     Hybrid method that currently only uses Periodic evaluation logic.
-    All short-term and KNN components have been removed as requested.
     """
     def __init__(self, model, X, y):
         super().__init__(model, X, y)
