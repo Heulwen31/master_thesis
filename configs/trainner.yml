@@ -11,7 +11,7 @@ sliding:
   retrain_interval: 50
 
 periodic:
-  retrain_interval: 1000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
+  retrain_interval: 5000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
 
 incremental:
   update_interval: 200  # Tăng từ 100: Tăng số lượng mẫu thu thập trước khi cập nhật ngắn hạn

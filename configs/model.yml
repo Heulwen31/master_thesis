@@ -1,34 +1,38 @@
 xgboost:
-  n_estimators: 1000
-  max_depth: 6
-  learning_rate: 0.05
-  subsample: 0.8
-  colsample_bytree: 0.8
+  n_estimators: 200
+  max_depth: 5
+  learning_rate: 0.08
+  subsample: 0.7
+  colsample_bytree: 0.7
   tree_method: "hist"
   random_state: 42
   n_jobs: -1
-  scale_pos_weight: 100 # Tăng trọng số cho lớp gian lận (thiểu số)
+  scale_pos_weight: 12 # Optimized sweet-spot for imbalanced fraud data (prevents precision collapse while maintaining high recall)
   max_delta_step: 1  
 
 lightgbm:
-  n_estimators: 1000
+  n_estimators: 200
   num_leaves: 31
-  learning_rate: 0.05
-  feature_fraction: 0.8
-  bagging_fraction: 0.8
+  max_depth: 5 # Limit tree depth to prevent deep overfitting
+  learning_rate: 0.08
+  feature_fraction: 0.7 # Speeds up column-wise construction and reduces variance
+  bagging_fraction: 0.7 # Speeds up row-wise construction
+  bagging_freq: 1 # Perform bagging at every iteration
   random_state: 42
   n_jobs: -1
   force_col_wise: true
-  verbose: -1          # Ẩn các cảnh báo log
-  min_child_samples: 5 # Cho phép chia nhánh với ít mẫu hơn (giúp học tốt hơn trên data nhỏ)
-  min_data_per_group: 100
-  max_cat_threshold: 32
+  verbose: -1
+  min_child_samples: 20
+  scale_pos_weight: 12 # Matched with XGBoost class weighting
 
 
 catboost:
-  iterations: 1000
-  depth: 6
-  learning_rate: 0.05
+  iterations: 200
+  depth: 5
+  learning_rate: 0.08
   random_seed: 42
   logging_level: "Silent"
   allow_writing_files: false
+  l2_leaf_reg: 5 # Increased regularization to prevent overfitting on small sliding windows
+  auto_class_weights: "SqrtBalanced" # Balanced class weights based on square root of inverse class frequencies
+
