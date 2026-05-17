@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, RobustScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import TargetEncoder
 from sklearn.model_selection import KFold
@@ -25,10 +25,30 @@ class BasePreprocessor:
         df['time'] = pd.to_datetime(df['time'], unit='s', origin=pd.Timestamp(reference_date))
         return df
 
+    def _normalize_features(self, df):
+        """Standardize numerical features using RobustScaler (best for fraud/imbalanced outliers)."""
+        print(f"Normalizing numerical features for {self.dataset_name} using RobustScaler...")
+        
+        # Select numerical columns except target and time
+        exclude = ['target', 'time']
+        num_cols = df.select_dtypes(include=['number']).columns.tolist()
+        num_cols = [col for col in num_cols if col not in exclude]
+        
+        if not num_cols:
+            print("  No numerical columns to normalize.")
+            return df
+            
+        scaler = RobustScaler()
+        # Handle NaNs temporarily for scaling if any remain
+        df[num_cols] = scaler.fit_transform(df[num_cols].fillna(df[num_cols].median()))
+        print(f"  Normalized {len(num_cols)} features.")
+        return df
+
     def run(self):
-        """Standard pipeline: load, process time, save to parquet."""
+        """Standard pipeline: load, process time, normalize, save to parquet."""
         df = self.loader.load_raw()
         df = self.process_time(df)
+        df = self._normalize_features(df)
         
         output_path = os.path.join(self.output_dir, f"{self.dataset_name}.parquet")
         print(f"Saving processed data to {output_path}...")
@@ -115,7 +135,7 @@ class IEEECISPreprocessor(BasePreprocessor):
         return df
 
     def run(self):
-        """Standard pipeline: load, process time, drop id, remove high null features, encode categorical, save to parquet."""
+        """Standard pipeline: load, process time, drop id, remove high null features, encode categorical, normalize, save to parquet."""
         df = self.loader.load_raw()
         df = self.process_time(df)
         
@@ -129,6 +149,9 @@ class IEEECISPreprocessor(BasePreprocessor):
         
         # Encode categorical features with appropriate strategy
         df = self._encode_categorical(df)
+
+        # Final normalization
+        df = self._normalize_features(df)
             
         output_path = os.path.join(self.output_dir, f"{self.dataset_name}.parquet")
         print(f"Saving processed data to {output_path}...")
@@ -215,7 +238,7 @@ class EcommerceFraudPreprocessor(BasePreprocessor):
         return df
 
     def run(self):
-        """Pipeline for Ecommerce Fraud: handles string dates, joins with IP mapping, drops id, saves to parquet."""
+        """Pipeline for Ecommerce Fraud: handles string dates, joins with IP mapping, drops id, normalize, saves to parquet."""
         # Load raw data
         path = os.path.join(self.project_root, self.loader.dataset_cfg['raw_path'])
         print(f"Loading {self.dataset_name} from {path}...")
@@ -278,6 +301,9 @@ class EcommerceFraudPreprocessor(BasePreprocessor):
         
         # Encode categorical features with appropriate strategy
         df = self._encode_categorical(df)
+
+        # Final normalization
+        df = self._normalize_features(df)
             
         output_path = os.path.join(self.output_dir, f"{self.dataset_name}.parquet")
         print(f"Saving processed data to {output_path}...")
