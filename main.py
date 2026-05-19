@@ -18,6 +18,7 @@ def main():
     parser.add_argument("--dataset", type=str, default="ieee_cis", choices=["ieee_cis", "creditcard", "fraud_ecommerce"], help="Dataset to evaluate on")
     parser.add_argument("--model", type=str, default="xgboost", choices=["xgboost", "lightgbm", "catboost"], help="Model to use")
     parser.add_argument("--method", type=str, default="sliding", choices=["sliding", "periodic", "incremental", "hybrid"], help="Evaluation method")
+    parser.add_argument("--max-samples", type=int, default=None, help="Cap rows after load (overrides pipeline subsample)")
     args = parser.parse_args()
 
     # Load config
@@ -39,12 +40,15 @@ def main():
         df = df.sort_values(by='time')
         df = df.drop(columns=['time'])
         
-    if mode == "subsample":
+    if args.max_samples is not None:
+        df = df.head(args.max_samples)
+        print(f"⚠️  Capped to {len(df)} records (--max-samples).")
+    elif mode == "subsample":
         size = pipeline_config.get("subsample_size", 50000)
         print(f"⚠️  SUBSAMPLE mode: taking first {size} records.")
         df = df.head(size)
     else:
-        print(f"✅ Using {len(df)} records.")
+        print(f"✅ FULL mode: using {len(df)} records.")
 
     # Convert non-numeric columns to categorical codes for better compatibility
     cat_cols = df.select_dtypes(exclude=['number', 'bool']).columns

@@ -9,3 +9,4 @@ pyarrow==24.0.0
 catboost==1.2.10
 lightgbm==4.6.0
 xgboost==3.2.0
+river>=0.21.0

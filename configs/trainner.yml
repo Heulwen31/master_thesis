@@ -1,7 +1,7 @@
 pipeline:
-  mode: "full" # Options: "subsample", "full" (Nếu đã chạy run_undersampling.sh thì file gốc đã được giảm mẫu)
-  init_train_size: 1000
-  subsample_size: 10000
+  mode: "full" # Options: "subsample", "full"
+  init_train_size: 10000
+  subsample_size: 30000
   sampling:
     target_majority_ratio: 0.90 # Lớp đa số chiếm n%
     min_total_samples: 50000    # Số mẫu tối thiểu giữ lại
@@ -11,15 +11,29 @@ sliding:
   retrain_interval: 200
 
 periodic:
-  retrain_interval: 1000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
+  retrain_interval: 5000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
 
 incremental:
   update_interval: 200  # Tăng từ 100: Tăng số lượng mẫu thu thập trước khi cập nhật ngắn hạn
   update_trees: 1000       # Giảm từ 500: Số lượng cây mới thêm vào (giảm bớt để tránh phình mô hình)
 
 hybrid:
-  short_term_method: "sliding" # Options: "sliding", "incremental"
-  similarity_threshold: 0.1  # Threshold for direct model selection
-  k_neighbors: 3             # Number of neighbors for weighted ensemble
-  weight_short: 1.0
-  weight_long: 2.0
+  # Tối ưu ROC-AUC / PR-AUC: chỉ BOOST xác suất, không hạ p_long
+  intervention_threshold: 0.15  # p_short phải đủ cao mới xét boost
+  incremental_margin: 0.02      # p_short > p_long + margin (short phải mạnh hơn long)
+  short_weight: 0.5             # Giảm nhiễu ARF trên negatives (<1 = boost nhẹ hơn)
+  alpha: 0.01
+  monitor_window: 500
+  min_monitor_samples: 100
+  accuracy_drop_threshold: 0.05
+  min_rolling_accuracy: null
+  error_burst_multiplier: 2.5
+  min_error_rate_for_burst: 0.02
+  use_brier_stress: true        # Stress khi Brier(long) tăng — gắn với chất lượng score
+  brier_increase_ratio: 0.12    # rolling_brier >= ema_brier * (1 + ratio)
+  stress_cooldown: 300
+  river_n_models: 5
+  river_lambda_value: 6
+  river_grace_period: 50
+  river_split_criterion: "info_gain"
+
