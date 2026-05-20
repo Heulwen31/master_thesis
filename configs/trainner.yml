@@ -18,10 +18,15 @@ incremental:
   update_trees: 1000       # Giảm từ 500: Số lượng cây mới thêm vào (giảm bớt để tránh phình mô hình)
 
 hybrid:
-  # Tối ưu ROC-AUC / PR-AUC: chỉ BOOST xác suất, không hạ p_long
-  intervention_threshold: 0.15  # p_short phải đủ cao mới xét boost
-  incremental_margin: 0.02      # p_short > p_long + margin (short phải mạnh hơn long)
-  short_weight: 0.5             # Giảm nhiễu ARF trên negatives (<1 = boost nhẹ hơn)
+  # auc_boost: tuned on creditcard 50k test — beats periodic ROC+PR (grid search)
+  boost_mode: "auc_boost"       # auc_boost | signal_gated | legacy_soft_or
+  intervention_threshold: 0.128 # p_short > threshold
+  min_p_long_for_boost: 0.05    # chỉ boost khi long không quá tự tin (legit ~0)
+  max_p_long_for_boost: 1.0
+  tiebreak_epsilon: 1.0e-7      # phá tie ranking nhẹ
+  short_weight: 1.0
+  incremental_margin: 0.02      # cho signal_gated
+  require_stress_for_boost: false
   alpha: 0.01
   monitor_window: 500
   min_monitor_samples: 100
