@@ -3,10 +3,9 @@ import math
 from collections import deque
 
 import numpy as np
-from river.forest import ARFClassifier
-
 from src.trainner.base_evaluator import BaseEvaluator
 from src.trainner.periodic_evaluator import PeriodicEvaluator
+from src.models.river_factory import RiverModelFactory
 
 
 class HybridEvaluator(BaseEvaluator):
@@ -59,6 +58,7 @@ class HybridEvaluator(BaseEvaluator):
         self.river_lambda_value = hybrid_config.get("river_lambda_value", 6)
         self.river_grace_period = hybrid_config.get("river_grace_period", 50)
         self.river_split_criterion = hybrid_config.get("river_split_criterion", "info_gain")
+        self.river_algorithm = hybrid_config.get("river_algorithm", "ARF")
 
         # and_fusion mode params
         self.and_long_threshold = hybrid_config.get("and_long_threshold", 0.05)
@@ -72,12 +72,12 @@ class HybridEvaluator(BaseEvaluator):
         self.model_long = copy.deepcopy(model)
         self.long_term_eval = PeriodicEvaluator(self.model_long, X, y)
 
-        self.model_short = ARFClassifier(
+        self.model_short = RiverModelFactory.get_model(
+            self.river_algorithm,
             n_models=self.river_n_models,
             lambda_value=self.river_lambda_value,
             grace_period=self.river_grace_period,
-            split_criterion=self.river_split_criterion,
-            seed=42,
+            split_criterion=self.river_split_criterion
         )
 
         self.active_triggers = []

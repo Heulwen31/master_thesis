@@ -14,8 +14,15 @@ periodic:
   retrain_interval: 5000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
 
 incremental:
-  update_interval: 200  # Tăng từ 100: Tăng số lượng mẫu thu thập trước khi cập nhật ngắn hạn
-  update_trees: 1000       # Giảm từ 500: Số lượng cây mới thêm vào (giảm bớt để tránh phình mô hình)
+  algorithm: "LeveragingBagging" # Options: ARF, HAT, LeveragingBagging
+  update_interval: 200
+  update_trees: 1000
+  n_models: 5
+  lambda_value: 6
+  grace_period: 50
+  split_criterion: "info_gain"
+  impute_nan: false
+
 
 hybrid:
   # Default params — tuned on creditcard (29 features, 0% NaN, 0.17% fraud)
@@ -41,6 +48,7 @@ hybrid:
   river_lambda_value: 6
   river_grace_period: 50
   river_split_criterion: "info_gain"
+  river_algorithm: "ARF"        # Thêm mới: ARF, HAT, LeveragingBagging
   and_long_threshold: 0.05      # and_fusion: long threshold
   prior_ratio: null             # auto-computed from init data if null
   short_max_features: null      # null = dùng tất cả features
