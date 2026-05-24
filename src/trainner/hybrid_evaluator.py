@@ -22,15 +22,21 @@ class HybridEvaluator(BaseEvaluator):
       - and_fusion: conservative AND-gate (both must agree) + log-odds
         blend with prior shrinkage. Designed for extreme class imbalance.
 
-    IEEE-CIS tuning (371 features, 30% NaN):
-      - short_max_features caps ARF input dim for high-D data
-      - impute_nan fills NaN before short model predict/learn
-      - Increase river_n_models, river_lambda_value in config
+    dataset_name is used to load per-dataset overrides from
+    configs/trainner.yml → hybrid → dataset_overrides → <dataset_name>.
+    Supports different ARF capacity / NaN handling per dataset.
     """
 
-    def __init__(self, model, X, y):
+    def __init__(self, model, X, y, dataset_name=None):
         super().__init__(model, X, y)
         hybrid_config = self.trainner_config.get("hybrid", {})
+
+        if dataset_name:
+            overrides = hybrid_config.get("dataset_overrides", {}).get(dataset_name, {})
+            if overrides:
+                base = {k: v for k, v in hybrid_config.items() if k != "dataset_overrides"}
+                hybrid_config = {**base, **overrides}
+                print(f"Applied hybrid overrides for dataset='{dataset_name}'")
         self.boost_mode = hybrid_config.get("boost_mode", "auc_boost")
         self.alpha = hybrid_config.get("alpha", 0.01)
         self.intervention_threshold = hybrid_config.get("intervention_threshold", 0.128)

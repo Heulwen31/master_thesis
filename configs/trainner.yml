@@ -18,7 +18,7 @@ incremental:
   update_trees: 1000       # Giảm từ 500: Số lượng cây mới thêm vào (giảm bớt để tránh phình mô hình)
 
 hybrid:
-  # auc_boost: tuned on creditcard 50k test — beats periodic ROC+PR (grid search)
+  # Default params — tuned on creditcard (29 features, 0% NaN, 0.17% fraud)
   boost_mode: "auc_boost"       # auc_boost | signal_gated | legacy_soft_or | and_fusion
   intervention_threshold: 0.128 # p_short > threshold
   min_p_long_for_boost: 0.05    # chỉ boost khi long không quá tự tin (legit ~0)
@@ -37,17 +37,21 @@ hybrid:
   use_brier_stress: true        # Stress khi Brier(long) tăng — gắn với chất lượng score
   brier_increase_ratio: 0.12    # rolling_brier >= ema_brier * (1 + ratio)
   stress_cooldown: 300
-  # IEEE-CIS optimized (371 features, 30% NaN): more trees, wider splits
-  river_n_models: 50            # 5 → 50: more ensemble coverage for high-D
-  river_lambda_value: 60        # 6 → 60: consider ~16% of features per split
-  river_grace_period: 200       # 50 → 200: more stats before splitting
+  river_n_models: 5             # small ARF — đủ cho ít features
+  river_lambda_value: 6
+  river_grace_period: 50
   river_split_criterion: "info_gain"
+  and_long_threshold: 0.05      # and_fusion: long threshold
+  prior_ratio: null             # auto-computed from init data if null
+  short_max_features: null      # null = dùng tất cả features
+  impute_nan: false             # mặc định tắt (creditcard 0% NaN)
 
-  # and_fusion: conservative AND-gate fusion for extreme imbalance
-  and_long_threshold: 0.05    # long must also be > this for AND boost
-  prior_ratio: null           # auto-computed from init data if null
-
-  # Short model input preparation (critical for high-D / NaN-rich data)
-  short_max_features: 100       # limit ARF to top-100 features (by long model importance)
-  impute_nan: true              # replace NaN with 0 before short model
-
+  # Per-dataset overrides — merged on top of defaults at runtime
+  dataset_overrides:
+    ieee_cis:
+      # 371 features, 30% NaN, ~10% fraud → ARF cần capacity gấp ~10x
+      river_n_models: 50
+      river_lambda_value: 60
+      river_grace_period: 200
+      short_max_features: 100
+      impute_nan: true

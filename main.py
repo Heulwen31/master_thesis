@@ -78,7 +78,7 @@ def main():
             elif m_name == "incremental":
                 evaluators[m_name] = IncrementalEvaluator(model_inst, X_df, y)
             elif m_name == "hybrid":
-                evaluators[m_name] = HybridEvaluator(model_inst, X_df, y)
+                evaluators[m_name] = HybridEvaluator(model_inst, X_df, y, dataset_name=args.dataset)
         
         reporter = ComparisonReporter(args.dataset, args.model, methods)
         
@@ -135,7 +135,7 @@ def main():
         elif args.method == "incremental":
             evaluator = IncrementalEvaluator(model, X_df, y)
         elif args.method == "hybrid":
-            evaluator = HybridEvaluator(model, X_df, y)
+            evaluator = HybridEvaluator(model, X_df, y, dataset_name=args.dataset)
             
         reporter = DriftReporter(args.dataset, args.model, args.method)
         
