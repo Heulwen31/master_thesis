@@ -19,7 +19,7 @@ incremental:
 
 hybrid:
   # auc_boost: tuned on creditcard 50k test — beats periodic ROC+PR (grid search)
-  boost_mode: "auc_boost"       # auc_boost | signal_gated | legacy_soft_or
+  boost_mode: "auc_boost"       # auc_boost | signal_gated | legacy_soft_or | and_fusion
   intervention_threshold: 0.128 # p_short > threshold
   min_p_long_for_boost: 0.05    # chỉ boost khi long không quá tự tin (legit ~0)
   max_p_long_for_boost: 1.0
@@ -37,8 +37,17 @@ hybrid:
   use_brier_stress: true        # Stress khi Brier(long) tăng — gắn với chất lượng score
   brier_increase_ratio: 0.12    # rolling_brier >= ema_brier * (1 + ratio)
   stress_cooldown: 300
-  river_n_models: 5
-  river_lambda_value: 6
-  river_grace_period: 50
+  # IEEE-CIS optimized (371 features, 30% NaN): more trees, wider splits
+  river_n_models: 50            # 5 → 50: more ensemble coverage for high-D
+  river_lambda_value: 60        # 6 → 60: consider ~16% of features per split
+  river_grace_period: 200       # 50 → 200: more stats before splitting
   river_split_criterion: "info_gain"
+
+  # and_fusion: conservative AND-gate fusion for extreme imbalance
+  and_long_threshold: 0.05    # long must also be > this for AND boost
+  prior_ratio: null           # auto-computed from init data if null
+
+  # Short model input preparation (critical for high-D / NaN-rich data)
+  short_max_features: 100       # limit ARF to top-100 features (by long model importance)
+  impute_nan: true              # replace NaN with 0 before short model
 

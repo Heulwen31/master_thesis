@@ -1,6 +1,8 @@
 import copy
+import math
 from collections import deque
 
+import numpy as np
 from river.forest import ARFClassifier
 
 from src.trainner.base_evaluator import BaseEvaluator
@@ -17,6 +19,13 @@ class HybridEvaluator(BaseEvaluator):
         50k test stream to improve ROC-AUC and PR-AUC vs periodic.
       - signal_gated: stress signals + monotonic boost (conservative).
       - legacy_soft_or: p_short > threshold → full soft-OR (no stress).
+      - and_fusion: conservative AND-gate (both must agree) + log-odds
+        blend with prior shrinkage. Designed for extreme class imbalance.
+
+    IEEE-CIS tuning (371 features, 30% NaN):
+      - short_max_features caps ARF input dim for high-D data
+      - impute_nan fills NaN before short model predict/learn
+      - Increase river_n_models, river_lambda_value in config
     """
 
     def __init__(self, model, X, y):
@@ -44,6 +53,15 @@ class HybridEvaluator(BaseEvaluator):
         self.river_lambda_value = hybrid_config.get("river_lambda_value", 6)
         self.river_grace_period = hybrid_config.get("river_grace_period", 50)
         self.river_split_criterion = hybrid_config.get("river_split_criterion", "info_gain")
+
+        # and_fusion mode params
+        self.and_long_threshold = hybrid_config.get("and_long_threshold", 0.05)
+        self.prior_ratio = hybrid_config.get("prior_ratio", None)
+
+        # Short model input preparation (critical for high-D / NaN-rich data)
+        self.short_max_features = hybrid_config.get("short_max_features", None)
+        self.impute_nan = hybrid_config.get("impute_nan", True)
+        self.short_selected_features = None
 
         self.model_long = copy.deepcopy(model)
         self.long_term_eval = PeriodicEvaluator(self.model_long, X, y)
@@ -85,12 +103,42 @@ class HybridEvaluator(BaseEvaluator):
             X_init = self.X[:size]
         y_init = self.y[:size]
 
+        if self.prior_ratio is None:
+            self.prior_ratio = float(y_init.mean())
+            print(f"Auto-computed prior_ratio = {self.prior_ratio:.6f}")
+
+        if self.short_max_features is not None and hasattr(self.model_long, 'feature_importances_'):
+            importances = self.model_long.feature_importances_
+            feature_names = X_init.columns.tolist()
+            n_sel = min(self.short_max_features, len(feature_names))
+            top_idx = np.argsort(importances)[-n_sel:]
+            self.short_selected_features = set(feature_names[i] for i in top_idx)
+            print(f"Short model: selected {n_sel}/{len(feature_names)} features by importance")
+
         print(f"Bootstrapping River short-term model on {size} samples...")
         for idx in range(size):
-            self.model_short.learn_one(X_init.iloc[idx].to_dict(), y_init[idx])
+            row = self._prepare_short_input(X_init.iloc[idx].to_dict())
+            self.model_short.learn_one(row, y_init[idx])
 
         print(f"Bootstrap complete. Hybrid boost_mode={self.boost_mode}")
         return size
+
+    @staticmethod
+    def _log_odds(p):
+        p = max(min(p, 1.0 - 1e-15), 1e-15)
+        return math.log(p / (1.0 - p))
+
+    @staticmethod
+    def _inv_log_odds(lo):
+        return 1.0 / (1.0 + math.exp(-lo))
+
+    def _prepare_short_input(self, row_dict):
+        if self.short_selected_features is not None:
+            row_dict = {k: v for k, v in row_dict.items() if k in self.short_selected_features}
+        if self.impute_nan:
+            row_dict = {k: (0.0 if isinstance(v, float) and math.isnan(v) else v)
+                        for k, v in row_dict.items()}
+        return row_dict
 
     def _fuse_monotonic(self, p_long, p_short):
         p_short_eff = min(self.short_weight * p_short, 1.0)
@@ -111,6 +159,32 @@ class HybridEvaluator(BaseEvaluator):
             if (not self.require_stress_for_boost or self.stress_active) and short_ok:
                 return self._fuse_monotonic(p_long, p_short), True
             return p_long, False
+
+        if self.boost_mode == "and_fusion":
+            short_boost = p_short * self.short_weight
+            y_prob = p_long * (1.0 + short_boost)
+            y_prob = min(y_prob, 1.0)
+
+            both_confident = (
+                p_short > self.intervention_threshold
+                and p_long > self.and_long_threshold
+            )
+
+            if both_confident:
+                lo_long = self._log_odds(p_long)
+                lo_short = self._log_odds(min(p_short, 0.999))
+                lo_prior = self._log_odds(self.prior_ratio)
+
+                w_short = 0.2 + 0.3 * min(p_short, 1.0)
+                w_long = 1.0 - w_short
+
+                lo_fused = (0.9 * (w_long * lo_long + w_short * lo_short)
+                            + 0.1 * lo_prior)
+                p_fused = self._inv_log_odds(lo_fused)
+                y_prob = max(y_prob, p_fused)
+                return min(y_prob, 1.0), True
+
+            return min(y_prob, 1.0), False
 
         # auc_boost (default): ambiguous-band soft-OR + tiny rank tie-break
         y_prob = p_long + p_short * self.tiebreak_epsilon
@@ -184,7 +258,7 @@ class HybridEvaluator(BaseEvaluator):
         else:
             X_test_df = self.X[i : i + 1]
 
-        x_test_dict = X_test_df.iloc[0].to_dict()
+        x_test_dict = self._prepare_short_input(X_test_df.iloc[0].to_dict())
         y_true = self.y[i]
 
         if i > self.initial_size:
@@ -193,7 +267,8 @@ class HybridEvaluator(BaseEvaluator):
                 X_prev_df = self.X.iloc[prev_idx : prev_idx + 1]
             else:
                 X_prev_df = self.X[prev_idx : prev_idx + 1]
-            self.model_short.learn_one(X_prev_df.iloc[0].to_dict(), self.y[prev_idx])
+            prev_dict = self._prepare_short_input(X_prev_df.iloc[0].to_dict())
+            self.model_short.learn_one(prev_dict, self.y[prev_idx])
 
         p_long = float(self.model_long.predict_proba(X_test_df)[0][1])
         p_short = float(self.model_short.predict_proba_one(x_test_dict).get(1, 0.0))
@@ -230,6 +305,14 @@ class HybridEvaluator(BaseEvaluator):
         if self.boost_mode == "auc_boost":
             print(f"║ threshold / band         : {self.intervention_threshold:.3f} "
                   f"({self.min_p_long_for_boost:.2f},{self.max_p_long_for_boost:.2f}) ║")
+        if self.boost_mode == "and_fusion":
+            print(f"║ AND thresh (short/long)  : {self.intervention_threshold:.3f} / "
+                  f"{self.and_long_threshold:.3f} ║")
+            print(f"║ prior_ratio              : {self.prior_ratio:.6f}           ║")
+        if self.short_selected_features is not None:
+            print(f"║ Short features           : selected={len(self.short_selected_features):>4}   ║")
+        if self.impute_nan:
+            print(f"║ NaN imputation           : on                           ║")
         print("═" * 58)
 
     def check_drift(self, is_correct):
