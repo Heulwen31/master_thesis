@@ -422,11 +422,11 @@ class ComparisonReporter:
         print(f"║ Dataset      : {self.dataset_name:<59} ║")
         print(f"║ Model        : {self.model_name:<59} ║")
         print("╟" + "─"*76 + "╢")
-        print(f"║ {'Method':<12} │ {'Accuracy':<8} │ {'Precision':<9} │ {'Recall':<8} │ {'F1-Score':<8} │ {'ROC-AUC':<8} │ {'Drifts':<6} ║")
+        print(f"║ {'Method':<12} │ {'Accuracy':<8} │ {'Precision':<9} │ {'Recall':<8} │ {'F1-Score':<8} │ {'ROC-AUC':<8} │ {'PR-AUC':<8} │ {'Drifts':<6} ║")
         print("╟" + "─"*76 + "╢")
         for m in self.methods:
             res = results[m]
-            print(f"║ {m.upper():<12} │ {res['accuracy']:>8.4f} │ {res['precision']:>9.4f} │ {res['recall']:>8.4f} │ {res['f1_score']:>8.4f} │ {res['roc_auc']:>8.4f} │ {res['total_drifts']:>6} ║")
+            print(f"║ {m.upper():<12} │ {res['accuracy']:>8.4f} │ {res['precision']:>9.4f} │ {res['recall']:>8.4f} │ {res['f1_score']:>8.4f} │ {res['roc_auc']:>8.4f} │ {res['pr_auc']:>8.4f} │ {res['total_drifts']:>6} ║")
         print("═"*78 + "\n")
 
         # Generate Diagnostic Plots

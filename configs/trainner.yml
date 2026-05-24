@@ -14,14 +14,26 @@ periodic:
   retrain_interval: 5000 # Tăng từ 1000: Long-term full retrain interval (ít cập nhật, học dữ liệu lớn)
 
 incremental:
-  algorithm: "LeveragingBagging" # Options: ARF, HAT, LeveragingBagging
-  update_interval: 200
-  update_trees: 1000
-  n_models: 5
-  lambda_value: 6
-  grace_period: 50
-  split_criterion: "info_gain"
-  impute_nan: false
+  algorithm: "ARF"             # ARF, HAT, LeveragingBagging
+  n_models: 20                 # more trees → robust ensemble for imbalanced data
+  lambda_value: 10             # Poisson lambda for bootstrap weights
+  grace_period: 200            # wait longer before splitting (more stable)
+  split_criterion: "gini"      # gini > info_gain for imbalanced data
+  leaf_prediction: "nba"       # Naive Bayes Adaptive (default)
+  max_depth: null              # unlimited depth
+  impute_nan: true             # auto-fill NaN → 0
+  fraud_weight: "auto"         # "auto" = inverse frequency (capped 100), or int
+
+  dataset_overrides:
+    ieee_cis:
+      algorithm: "LeveragingBagging"
+      n_models: 10
+      lambda_value: 6
+      grace_period: 500
+      fraud_weight: "auto"
+    fraud_ecommerce:
+      n_models: 20
+      grace_period: 300
 
 
 hybrid:
