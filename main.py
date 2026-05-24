@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run the sliding window evaluation pipeline.")
     parser.add_argument("--dataset", type=str, default="ieee_cis", choices=["ieee_cis", "creditcard", "fraud_ecommerce"], help="Dataset to evaluate on")
     parser.add_argument("--model", type=str, default="xgboost", choices=["xgboost", "lightgbm", "catboost"], help="Model to use")
-    parser.add_argument("--method", type=str, default="sliding", choices=["sliding", "periodic", "incremental", "hybrid"], help="Evaluation method")
+    parser.add_argument("--method", type=str, default="sliding", choices=["sliding", "periodic", "incremental", "hybrid", "all"], help="Evaluation method")
     parser.add_argument("--max-samples", type=int, default=None, help="Cap rows after load (overrides pipeline subsample)")
     args = parser.parse_args()
 
@@ -63,55 +63,117 @@ def main():
     y = df['target'].values
     X_df = df.drop(columns=['target'])
     
-    # 2. Initialize Components
-    model = create_model(args.model)
-    
-    if args.method == "sliding":
-        evaluator = SlidingEvaluator(model, X_df, y)
-    elif args.method == "periodic":
-        evaluator = PeriodicEvaluator(model, X_df, y)
-    elif args.method == "incremental":
-        evaluator = IncrementalEvaluator(model, X_df, y)
-    elif args.method == "hybrid":
-        evaluator = HybridEvaluator(model, X_df, y)
+    # 2. Initialize Components & 3. Initial Training (Warm-up)
+    if args.method == "all":
+        from src.evaluation.reporter import ComparisonReporter
+        methods = ["sliding", "periodic", "incremental", "hybrid"]
+        evaluators = {}
         
-    reporter = DriftReporter(args.dataset, args.model, args.method)
-    
-    # 3. Initial Training (Warm-up)
-    initial_size = evaluator.init_train()
-    
-    # 4. Evaluation Loop (Moved to main for better control)
-    print("Starting prequential evaluation...")
-    n_samples = len(X_df)
-    retraining_start_idx = 0
-    
-    for i in range(initial_size, n_samples):
-        # Step 1: Predict (Test)
-        y_true, y_pred, y_prob = evaluator.predict_step(i)
+        for m_name in methods:
+            model_inst = create_model(args.model)
+            if m_name == "sliding":
+                evaluators[m_name] = SlidingEvaluator(model_inst, X_df, y)
+            elif m_name == "periodic":
+                evaluators[m_name] = PeriodicEvaluator(model_inst, X_df, y)
+            elif m_name == "incremental":
+                evaluators[m_name] = IncrementalEvaluator(model_inst, X_df, y)
+            elif m_name == "hybrid":
+                evaluators[m_name] = HybridEvaluator(model_inst, X_df, y)
         
-        # Step 2: Record Metrics
-        reporter.add_step(y_true, y_pred, y_prob)
+        reporter = ComparisonReporter(args.dataset, args.model, methods)
         
-        # Step 3: Check for Drift
-        is_correct = 1 if y_pred == y_true else 0
-        drift_detected = evaluator.check_drift(is_correct)
+        initial_size = None
+        for m_name in methods:
+            size = evaluators[m_name].init_train()
+            if initial_size is None:
+                initial_size = size
         
-        if drift_detected:
-            # Step 4: Retrain if needed
-            retraining_point = evaluator.retrain(i, retraining_start_idx)
-            reporter.add_drift(i, retraining_point)
-            retraining_start_idx = i + 1
-            
-        if i % 1000 == 0:
-            print(f"Processed samples: {i}/{n_samples}...", end="\r")
+        reporter.initial_size = initial_size
 
-    # 5. Generate Final Report
-    if args.method == "hybrid" and hasattr(evaluator, 'print_stats'):
-        evaluator.print_stats()
+        # 4. Evaluation Loop
+        print(f"Starting prequential evaluation for ALL methods (Warm-up size: {initial_size})...")
+        n_samples = len(X_df)
+        retraining_start_idxs = {m_name: 0 for m_name in methods}
         
-    # Pass evaluation features for error analysis
-    X_eval = X_df.iloc[initial_size:]
-    reporter.generate_report(X_eval=X_eval)
+        for i in range(initial_size, n_samples):
+            for m_name in methods:
+                evaluator = evaluators[m_name]
+                # Step 1: Predict (Test)
+                y_true, y_pred, y_prob = evaluator.predict_step(i)
+                
+                # Step 2: Record Metrics
+                reporter.add_step(m_name, y_true, y_pred, y_prob)
+                
+                # Step 3: Check for Drift
+                is_correct = 1 if y_pred == y_true else 0
+                drift_detected = evaluator.check_drift(is_correct)
+                
+                if drift_detected:
+                    # Step 4: Retrain if needed
+                    retraining_point = evaluator.retrain(i, retraining_start_idxs[m_name])
+                    reporter.add_drift(m_name, i, retraining_point)
+                    retraining_start_idxs[m_name] = i + 1
+                    
+            if i % 1000 == 0:
+                print(f"Processed samples: {i}/{n_samples}...", end="\r")
+
+        # 5. Generate Final Report
+        if "hybrid" in evaluators and hasattr(evaluators["hybrid"], 'print_stats'):
+            evaluators["hybrid"].print_stats()
+            
+        # Pass evaluation features for error analysis
+        X_eval = X_df.iloc[initial_size:]
+        reporter.generate_report(X_eval=X_eval)
+
+    else:
+        model = create_model(args.model)
+        
+        if args.method == "sliding":
+            evaluator = SlidingEvaluator(model, X_df, y)
+        elif args.method == "periodic":
+            evaluator = PeriodicEvaluator(model, X_df, y)
+        elif args.method == "incremental":
+            evaluator = IncrementalEvaluator(model, X_df, y)
+        elif args.method == "hybrid":
+            evaluator = HybridEvaluator(model, X_df, y)
+            
+        reporter = DriftReporter(args.dataset, args.model, args.method)
+        
+        # 3. Initial Training (Warm-up)
+        initial_size = evaluator.init_train()
+        
+        # 4. Evaluation Loop
+        print(f"Starting prequential evaluation for {args.method}...")
+        n_samples = len(X_df)
+        retraining_start_idx = 0
+        
+        for i in range(initial_size, n_samples):
+            # Step 1: Predict (Test)
+            y_true, y_pred, y_prob = evaluator.predict_step(i)
+            
+            # Step 2: Record Metrics
+            reporter.add_step(y_true, y_pred, y_prob)
+            
+            # Step 3: Check for Drift
+            is_correct = 1 if y_pred == y_true else 0
+            drift_detected = evaluator.check_drift(is_correct)
+            
+            if drift_detected:
+                # Step 4: Retrain if needed
+                retraining_point = evaluator.retrain(i, retraining_start_idx)
+                reporter.add_drift(i, retraining_point)
+                retraining_start_idx = i + 1
+                
+            if i % 1000 == 0:
+                print(f"Processed samples: {i}/{n_samples}...", end="\r")
+
+        # 5. Generate Final Report
+        if args.method == "hybrid" and hasattr(evaluator, 'print_stats'):
+            evaluator.print_stats()
+            
+        # Pass evaluation features for error analysis
+        X_eval = X_df.iloc[initial_size:]
+        reporter.generate_report(X_eval=X_eval)
 
 if __name__ == "__main__":
     sys.dont_write_bytecode = True

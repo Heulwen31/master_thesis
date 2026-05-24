@@ -183,3 +183,255 @@ class DriftReporter:
         print("═"*60 + "\n")
         
         return results
+
+
+class ComparisonReporter:
+    """
+    Handles collecting metrics and generating comparison reports/plots for multiple methods.
+    """
+    def __init__(self, dataset_name, model_name, methods):
+        self.dataset_name = dataset_name
+        self.model_name = model_name
+        self.methods = methods
+        self.predictions = {m: [] for m in methods}
+        self.probabilities = {m: [] for m in methods}
+        self.ground_truth = {m: [] for m in methods}
+        self.drifts = {m: [] for m in methods}
+        self.initial_size = 0
+
+    def add_step(self, method, y_true, y_pred, y_prob):
+        """Collects a single prediction result for a specific method."""
+        self.ground_truth[method].append(y_true)
+        self.predictions[method].append(y_pred)
+        self.probabilities[method].append(y_prob)
+
+    def add_drift(self, method, index, retraining_point):
+        """Records a drift event for a specific method."""
+        self.drifts[method].append({
+            'detected_at': int(index),
+            'retrained_from': int(retraining_point)
+        })
+
+    def _generate_comparison_visualizations(self, results, X_eval):
+        """Generates unified visual dashboards comparing all methods."""
+        os.makedirs("outputs/plots", exist_ok=True)
+        colors = {
+            'sliding': '#1f77b4',     # blue
+            'periodic': '#ff7f0e',    # orange
+            'incremental': '#2ca02c', # green
+            'hybrid': '#9467bd'       # purple
+        }
+        styles = {
+            'sliding': {'linestyle': '-', 'linewidth': 3.0},
+            'periodic': {'linestyle': '-', 'linewidth': 3.0},
+            'incremental': {'linestyle': '--', 'linewidth': 1.5},
+            'hybrid': {'linestyle': ':', 'linewidth': 2.0}
+        }
+        
+        # 1. Dashboard (2x2)
+        fig, axes = plt.subplots(2, 2, figsize=(18, 14))
+        
+        # Top-Left: Rolling Accuracy (Window=1000)
+        ax = axes[0, 0]
+        y_true_first = np.array(self.ground_truth[self.methods[0]])
+        rolling_fraud = np.convolve(y_true_first, np.ones(1000)/1000, mode='valid')
+        ax_twin = ax.twinx()
+        ax_twin.plot(rolling_fraud, color='grey', alpha=0.2, linestyle='--', label='Rolling Fraud Rate (Window=1000)')
+        ax_twin.set_ylabel("Fraud Rate", color='grey', alpha=0.5)
+        ax_twin.tick_params(axis='y', labelcolor='grey')
+        
+        for m in self.methods:
+            is_correct = (np.array(self.predictions[m]) == np.array(self.ground_truth[m]))
+            rolling_acc = np.convolve(is_correct, np.ones(1000)/1000, mode='valid')
+            ax.plot(rolling_acc, color=colors[m], label=f'{m.upper()}', **styles[m])
+            
+        ax.set_title("Rolling Accuracy Over Time (Window=1000)", fontsize=12, fontweight='bold')
+        ax.set_xlabel("Sample Index")
+        ax.set_ylabel("Accuracy")
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc='lower left')
+        
+        # Top-Right: Cumulative Errors
+        ax = axes[0, 1]
+        for m in self.methods:
+            is_incorrect = (np.array(self.predictions[m]) != np.array(self.ground_truth[m]))
+            cum_errors = np.cumsum(is_incorrect)
+            ax.plot(cum_errors, color=colors[m], label=f'{m.upper()}', **styles[m])
+        ax.set_title("Cumulative Errors Over Time (Lower is Better)", fontsize=12, fontweight='bold')
+        ax.set_xlabel("Sample Index")
+        ax.set_ylabel("Cumulative Error Count")
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc='upper left')
+        
+        # Bottom-Left: Radar (Spider) Chart
+        fig.delaxes(axes[1, 0])
+        ax_radar = fig.add_subplot(2, 2, 3, polar=True)
+        
+        categories = ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC']
+        N = len(categories)
+        angles = [n / float(N) * 2 * np.pi for n in range(N)]
+        angles += angles[:1]
+        
+        ax_radar.set_theta_offset(np.pi / 2)
+        ax_radar.set_theta_direction(-1)
+        
+        ax_radar.set_xticks(angles[:-1])
+        ax_radar.set_xticklabels(categories, fontsize=9, fontweight='semibold')
+        
+        ax_radar.set_rlabel_position(0)
+        ax_radar.set_rticks([0.2, 0.4, 0.6, 0.8, 1.0])
+        ax_radar.set_yticklabels(["0.2", "0.4", "0.6", "0.8", "1.0"], color="grey", size=7)
+        ax_radar.set_ylim(0, 1.0)
+        
+        for m in self.methods:
+            values = [
+                results[m]['accuracy'],
+                results[m]['precision'],
+                results[m]['recall'],
+                results[m]['f1_score'],
+                results[m]['roc_auc']
+            ]
+            values += values[:1]
+            ax_radar.plot(angles, values, color=colors[m], linewidth=1.5, linestyle='solid', label=m.upper())
+            ax_radar.fill(angles, values, color=colors[m], alpha=0.08)
+            
+        ax_radar.set_title("Overall Metric Comparison (Radar Chart)", fontsize=12, fontweight='bold', pad=15)
+        ax_radar.legend(loc='lower center', bbox_to_anchor=(0.5, -0.2), ncol=2, fontsize=9)
+        
+        # Bottom-Right: Cumulative Retrains (Computational Cost)
+        ax = axes[1, 1]
+        for m in self.methods:
+            n_eval_samples = len(self.predictions[m])
+            retrain_timeline = np.zeros(n_eval_samples)
+            
+            for drift in self.drifts[m]:
+                rel_idx = drift['detected_at'] - self.initial_size
+                if 0 <= rel_idx < n_eval_samples:
+                    retrain_timeline[rel_idx] = 1
+            cum_retrains = np.cumsum(retrain_timeline)
+            ax.plot(cum_retrains, color=colors[m], label=f'{m.upper()} (Total: {len(self.drifts[m])})', **styles[m])
+            
+        ax.set_title("Cumulative Retraining Events (Lower is Better)", fontsize=12, fontweight='bold')
+        ax.set_xlabel("Sample Index")
+        ax.set_ylabel("Cumulative Retrain Count")
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc='upper left')
+        
+        plt.suptitle(f"Method Comparison Dashboard - {self.dataset_name} ({self.model_name.upper()})", fontsize=16, fontweight='bold', y=0.98)
+        plt.tight_layout()
+        
+        # Save dataset-specific dashboard
+        specific_dash = f"outputs/plots/comparison_dashboard_{self.dataset_name}_{self.model_name}.png"
+        plt.savefig(specific_dash, bbox_inches='tight', dpi=150)
+        # Save generic latest dashboard
+        plt.savefig("outputs/plots/comparison_dashboard.png", bbox_inches='tight', dpi=150)
+        plt.close()
+        print(f"Comparison Dashboard saved to: {specific_dash}")
+        
+        # 2. Curves Plot (ROC & PR)
+        from sklearn.metrics import roc_curve, precision_recall_curve
+        fig, (ax_roc, ax_pr) = plt.subplots(1, 2, figsize=(16, 7))
+        
+        for m in self.methods:
+            y_true = np.array(self.ground_truth[m])
+            y_prob = np.array(self.probabilities[m])
+            
+            # ROC curve
+            fpr, tpr, _ = roc_curve(y_true, y_prob)
+            ax_roc.plot(fpr, tpr, color=colors[m], label=f"{m.upper()} (AUC = {results[m]['roc_auc']:.4f})", **styles[m])
+            
+            # PR curve
+            precision, recall, _ = precision_recall_curve(y_true, y_prob)
+            ax_pr.plot(recall, precision, color=colors[m], label=f"{m.upper()} (AUC = {results[m]['pr_auc']:.4f})", **styles[m])
+            
+        ax_roc.plot([0, 1], [0, 1], color='navy', linestyle='--', alpha=0.5)
+        ax_roc.set_xlim([0.0, 1.0])
+        ax_roc.set_ylim([0.0, 1.05])
+        ax_roc.set_xlabel('False Positive Rate')
+        ax_roc.set_ylabel('True Positive Rate')
+        ax_roc.set_title('ROC Curve Comparison', fontsize=12, fontweight='bold')
+        ax_roc.legend(loc="lower right")
+        ax_roc.grid(True, alpha=0.3)
+        
+        ax_pr.set_xlim([0.0, 1.0])
+        ax_pr.set_ylim([0.0, 1.05])
+        ax_pr.set_xlabel('Recall')
+        ax_pr.set_ylabel('Precision')
+        ax_pr.set_title('Precision-Recall Curve Comparison', fontsize=12, fontweight='bold')
+        ax_pr.legend(loc="lower left")
+        ax_pr.grid(True, alpha=0.3)
+        
+        plt.suptitle(f"ROC & PR Curves Comparison - {self.dataset_name} ({self.model_name.upper()})", fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        
+        # Save specific curve plot
+        specific_curves = f"outputs/plots/comparison_curves_{self.dataset_name}_{self.model_name}.png"
+        plt.savefig(specific_curves, bbox_inches='tight', dpi=150)
+        # Save generic latest curve plot
+        plt.savefig("outputs/plots/comparison_curves.png", bbox_inches='tight', dpi=150)
+        plt.close()
+        print(f"Comparison Curves saved to: {specific_curves}")
+
+    def generate_report(self, X_eval=None):
+        """Calculates final metrics for all methods, saves to JSON, and prints comparative summary."""
+        results = {}
+        
+        for m in self.methods:
+            y_true = np.array(self.ground_truth[m])
+            y_pred = np.array(self.predictions[m])
+            y_prob = np.array(self.probabilities[m])
+            
+            acc = float(accuracy_score(y_true, y_pred))
+            prec = float(precision_score(y_true, y_pred, zero_division=0))
+            rec = float(recall_score(y_true, y_pred, zero_division=0))
+            f1 = float(f1_score(y_true, y_pred, zero_division=0))
+            
+            try:
+                roc_auc = float(roc_auc_score(y_true, y_prob))
+                pr_auc = float(average_precision_score(y_true, y_prob))
+            except:
+                roc_auc = 0.0
+                pr_auc = 0.0
+                
+            results[m] = {
+                "accuracy": acc,
+                "precision": prec,
+                "recall": rec,
+                "f1_score": f1,
+                "roc_auc": roc_auc,
+                "pr_auc": pr_auc,
+                "total_drifts": len(self.drifts[m]),
+                "drift_details": self.drifts[m]
+            }
+
+        # Save to JSON
+        os.makedirs("outputs", exist_ok=True)
+        filename = f"outputs/report_all_{self.dataset_name}_{self.model_name}.json"
+        with open(filename, 'w') as f:
+            json.dump({
+                "dataset": self.dataset_name,
+                "model": self.model_name,
+                "methods_compared": self.methods,
+                "results": results
+            }, f, indent=4)
+            
+        # Print comparison table
+        print("\n" + "═"*78)
+        print(f"║ {'COMPARATIVE EVALUATION REPORT':^74} ║")
+        print("═"*78)
+        print(f"║ Dataset      : {self.dataset_name:<59} ║")
+        print(f"║ Model        : {self.model_name:<59} ║")
+        print("╟" + "─"*76 + "╢")
+        print(f"║ {'Method':<12} │ {'Accuracy':<8} │ {'Precision':<9} │ {'Recall':<8} │ {'F1-Score':<8} │ {'ROC-AUC':<8} │ {'Drifts':<6} ║")
+        print("╟" + "─"*76 + "╢")
+        for m in self.methods:
+            res = results[m]
+            print(f"║ {m.upper():<12} │ {res['accuracy']:>8.4f} │ {res['precision']:>9.4f} │ {res['recall']:>8.4f} │ {res['f1_score']:>8.4f} │ {res['roc_auc']:>8.4f} │ {res['total_drifts']:>6} ║")
+        print("═"*78 + "\n")
+
+        # Generate Diagnostic Plots
+        print("Generating diagnostic comparison visualizations...")
+        self._generate_comparison_visualizations(results, X_eval)
+        
+        return results
+
